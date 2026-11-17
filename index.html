@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pixel Blackjack 21 &amp; Roleta Russa</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- MENU PRINCIPAL -->
+  <section id="main-menu" class="menu-screen">
+    <div class="menu-card pixel-panel-gold">
+      <div class="menu-art-row">
+        <img src="assets/logo_emblem.png" alt="Logo Pixel Blackjack" class="pixel-img menu-emblem" />
+        <img src="assets/dealer.gif" alt="Crupiê Pixel" class="pixel-img menu-dealer" />
+      </div>
+
+      <div>
+        <h1 class="game-title">PIXEL BLACKJACK 21</h1>
+        <p class="game-subtitle">CASSINO RETRÔ 16-BIT • SOLO &amp; ONLINE LAN (ATÉ 5)</p>
+      </div>
+
+      <div class="bankroll-select">
+        <div class="bankroll-select-label">BANCA INICIAL (MODO SOLO)</div>
+        <div class="bankroll-options">
+          <button type="button" class="mode-pill" data-bankroll="500">$500 CLÁSSICO</button>
+          <button type="button" class="mode-pill active" data-bankroll="1000">$1.000 VIP</button>
+          <button type="button" class="mode-pill" data-bankroll="2500">$2.500 HIGH ROLLER</button>
+        </div>
+      </div>
+
+      <div class="menu-actions">
+        <button id="btn-start-game" type="button" class="pixel-btn btn-green menu-play-btn">
+          MODO SOLO: BLACKJACK CLÁSSICO
+        </button>
+        <button id="btn-continue-game" type="button" class="pixel-btn btn-gold hidden">
+          CONTINUAR MESA SOLO (<span id="saved-bankroll-label">$1000</span>)
+        </button>
+        <button id="btn-open-roulette" type="button" class="pixel-btn btn-red menu-play-btn">
+          MODO ONLINE: ROLETA RUSSA (ATÉ 5)
+        </button>
+        <button id="btn-menu-rules" type="button" class="pixel-btn">
+          COMO JOGAR (REGRAS)
+        </button>
+      </div>
+
+      <div class="menu-audio-row">
+        <button id="btn-menu-bgm" type="button" class="pixel-btn btn-slate btn-sm">MÚSICA: ON</button>
+        <button id="btn-menu-sfx" type="button" class="pixel-btn btn-slate btn-sm">SONS: ON</button>
+      </div>
+
+      <div class="menu-footer">
+        Trabalho de Redes de Computadores • Servidor HTTP Nginx / Python LAN
+      </div>
+    </div>
+  </section>
+
+  <!-- MESA DO JOGO SOLO (BLACKJACK CLÁSSICO) -->
+  <main id="table-screen" class="table-screen hidden">
+    <header class="hud-bar pixel-panel">
+      <div class="hud-group">
+        <button id="btn-back-menu" type="button" class="pixel-btn btn-slate btn-sm">MENU</button>
+        <button id="btn-table-rules" type="button" class="pixel-btn btn-sm">REGRAS</button>
+      </div>
+
+      <div class="hud-group">
+        <div class="stat-box">
+          <div class="stat-label">SALDO</div>
+          <div id="hud-bankroll" class="stat-value">$1000</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">APOSTA</div>
+          <div id="hud-bet" class="stat-value cyan">$0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">SEQUÊNCIA</div>
+          <div id="hud-streak" class="stat-value lime">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">RECORDE</div>
+          <div id="hud-best" class="stat-value">$1000</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">BARALHO</div>
+          <div id="hud-shoe" class="stat-value cyan">312</div>
+        </div>
+      </div>
+
+      <div class="hud-group">
+        <button id="btn-table-bgm" type="button" class="pixel-btn btn-slate btn-sm">BGM: ON</button>
+        <button id="btn-table-sfx" type="button" class="pixel-btn btn-slate btn-sm">SFX: ON</button>
+      </div>
+    </header>
+
+    <section class="playfield">
+      <div class="dealer-section">
+        <div class="dealer-header">
+          <div class="dealer-portrait-frame">
+            <img id="dealer-sprite" src="assets/dealer.gif" alt="Dealer" class="pixel-img dealer-sprite" />
+          </div>
+          <div id="dealer-speech" class="speech-bubble">
+            Bem-vindo à mesa! Escolha suas fichas e faça sua aposta.
+          </div>
+        </div>
+
+        <div class="zone-label-row">
+          <span class="zone-title">MÃO DA BANCA (DEALER)</span>
+          <span id="dealer-score" class="score-badge">0</span>
+        </div>
+
+        <div id="dealer-cards" class="cards-row"></div>
+      </div>
+
+      <div class="center-ribbon">
+        <div id="status-banner" class="status-banner">FAÇA SUA APOSTA</div>
+        <div class="bet-pot-display">
+          <span>FICHAS NA MESA:</span>
+          <span id="bet-pot-value">$0</span>
+          <div id="bet-pot-chips" class="bet-pot-chips"></div>
+        </div>
+        <div class="table-rules-note">
+          BLACKJACK PAGA 3:2 • DEALER PARA NO 17 • 6 BARALHOS
+        </div>
+      </div>
+
+      <div id="player-hands-wrapper" class="hands-wrapper"></div>
+    </section>
+
+    <footer class="controls-dock pixel-panel">
+      <div id="betting-controls">
+        <div class="chips-row">
+          <button type="button" class="chip-btn" data-chip="10">
+            <img src="assets/chip_10.png" alt="$10" class="pixel-img" />
+            <span>$10</span>
+          </button>
+          <button type="button" class="chip-btn" data-chip="25">
+            <img src="assets/chip_25.png" alt="$25" class="pixel-img" />
+            <span>$25</span>
+          </button>
+          <button type="button" class="chip-btn" data-chip="50">
+            <img src="assets/chip_50.png" alt="$50" class="pixel-img" />
+            <span>$50</span>
+          </button>
+          <button type="button" class="chip-btn" data-chip="100">
+            <img src="assets/chip_100.png" alt="$100" class="pixel-img" />
+            <span>$100</span>
+          </button>
+          <button type="button" class="chip-btn" data-chip="500">
+            <img src="assets/chip_500.png" alt="$500" class="pixel-img" />
+            <span>$500</span>
+          </button>
+        </div>
+
+        <div class="actions-row" style="margin-top: 10px;">
+          <button id="btn-clear-bet" type="button" class="pixel-btn btn-red btn-sm">LIMPAR</button>
+          <button id="btn-rebet" type="button" class="pixel-btn btn-slate btn-sm">REAPOSTAR</button>
+          <button id="btn-all-in" type="button" class="pixel-btn btn-orange btn-sm">ALL-IN</button>
+          <button id="btn-deal" type="button" class="pixel-btn btn-green">DAR CARTAS</button>
+          <button id="btn-rebuy" type="button" class="pixel-btn btn-gold hidden">RECARREGAR ($1000)</button>
+        </div>
+      </div>
+
+      <div id="insurance-controls" class="actions-row hidden">
+        <button id="btn-insure-yes" type="button" class="pixel-btn btn-gold">
+          FAZER SEGURO (<span id="insurance-cost">$0</span>)
+        </button>
+        <button id="btn-insure-no" type="button" class="pixel-btn btn-slate">
+          RECUSAR SEGURO
+        </button>
+      </div>
+
+      <div id="turn-controls" class="actions-row hidden">
+        <button id="btn-hit" type="button" class="pixel-btn btn-green">PEDIR (HIT)</button>
+        <button id="btn-stand" type="button" class="pixel-btn btn-red">PARAR (STAND)</button>
+        <button id="btn-double" type="button" class="pixel-btn btn-gold">DOBRAR (2X)</button>
+        <button id="btn-split" type="button" class="pixel-btn">DIVIDIR (SPLIT)</button>
+      </div>
+
+      <div id="resolve-controls" class="actions-row hidden">
+        <button id="btn-play-again" type="button" class="pixel-btn btn-green">MESMA APOSTA</button>
+        <button id="btn-new-bet" type="button" class="pixel-btn btn-gold">NOVA APOSTA</button>
+      </div>
+    </footer>
+  </main>
+
+  <!-- LOBBY ONLINE: ROLETA RUSSA 21 (ATÉ 5 JOGADORES) -->
+  <section id="roulette-lobby" class="table-screen hidden">
+    <header class="hud-bar pixel-panel">
+      <div class="hud-group">
+        <button id="btn-rl-menu" type="button" class="pixel-btn btn-slate btn-sm">MENU</button>
+        <button id="btn-rl-rules" type="button" class="pixel-btn btn-sm">REGRAS ROLETA</button>
+      </div>
+      <div class="hud-group">
+        <div class="stat-box">
+          <div class="stat-label">SUA MÁQUINA NA REDE</div>
+          <div id="rl-my-device" class="stat-value cyan">Detectando...</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">NA MESA</div>
+          <div id="rl-player-count" class="stat-value lime">0 / 5</div>
+        </div>
+      </div>
+      <div class="hud-group">
+        <button id="btn-rl-bgm" type="button" class="pixel-btn btn-slate btn-sm">BGM: ON</button>
+        <button id="btn-rl-sfx" type="button" class="pixel-btn btn-slate btn-sm">SFX: ON</button>
+      </div>
+    </header>
+
+    <div id="rl-server-warning" class="pixel-panel-gold server-warning hidden">
+      <strong>Servidor Multiplayer não detectado!</strong>
+      Para jogar em rede (até 5 máquinas), inicie no servidor:
+      <code>python3 server.py --port 8080</code> (ou configure o Nginx para redirecionar <code>/api/</code>).
+    </div>
+
+    <section class="lobby-grid">
+      <!-- Configurar Nick & Skin -->
+      <div class="pixel-panel-gold lobby-card">
+        <h2 class="lobby-heading">1. SEU NICK E PERSONAGEM</h2>
+        <div class="nick-row">
+          <label for="rl-nick-input" class="nick-label">SEU NICK:</label>
+          <input id="rl-nick-input" type="text" maxlength="16" placeholder="Ex: Caua_PC1" class="pixel-input" />
+          <button id="btn-rl-join" type="button" class="pixel-btn btn-green btn-sm">ENTRAR / SALVAR</button>
+        </div>
+
+        <div class="skins-grid" id="rl-skins-grid">
+          <button type="button" class="skin-card active" data-skin="outlaw">
+            <img src="assets/char_outlaw_idle.gif" alt="Billy" class="pixel-img" />
+            <span class="skin-name">Billy</span>
+            <span class="skin-role">Pistoleiro</span>
+          </button>
+          <button type="button" class="skin-card" data-skin="duchess">
+            <img src="assets/char_duchess_idle.gif" alt="Viper" class="pixel-img" />
+            <span class="skin-name">Viper</span>
+            <span class="skin-role">Duquesa</span>
+          </button>
+          <button type="button" class="skin-card" data-skin="cyber">
+            <img src="assets/char_cyber_idle.gif" alt="Zero" class="pixel-img" />
+            <span class="skin-name">Zero</span>
+            <span class="skin-role">Hacker</span>
+          </button>
+          <button type="button" class="skin-card" data-skin="boss">
+            <img src="assets/char_boss_idle.gif" alt="Don" class="pixel-img" />
+            <span class="skin-name">Don</span>
+            <span class="skin-role">Magnata</span>
+          </button>
+          <button type="button" class="skin-card" data-skin="phantom">
+            <img src="assets/char_phantom_idle.gif" alt="Reaper" class="pixel-img" />
+            <span class="skin-name">Reaper</span>
+            <span class="skin-role">Fantasma</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Lista de Jogadores na Rede -->
+      <div class="pixel-panel lobby-card">
+        <h2 class="lobby-heading">2. JOGADORES CONECTADOS NA REDE (MÁX. 5)</h2>
+        <div id="rl-lobby-players" class="lobby-roster"></div>
+
+        <div class="actions-row" style="margin-top: 8px;">
+          <button id="btn-rl-add-bot" type="button" class="pixel-btn btn-slate btn-sm">+ BOT (TESTE)</button>
+          <button id="btn-rl-clear-bots" type="button" class="pixel-btn btn-orange btn-sm">LIMPAR BOTS</button>
+          <button id="btn-rl-leave" type="button" class="pixel-btn btn-red btn-sm">SAIR DA MESA</button>
+          <button id="btn-rl-start" type="button" class="pixel-btn btn-gold">INICIAR PARTIDA</button>
+        </div>
+
+        <div class="network-devices-box">
+          <div class="network-devices-title">MÁQUINAS RECONHECIDAS NA REDE:</div>
+          <div id="rl-network-devices" class="network-devices-list"></div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ARENA ONLINE: ROLETA RUSSA 21 -->
+  <main id="roulette-screen" class="table-screen hidden">
+    <header class="hud-bar pixel-panel">
+      <div class="hud-group">
+        <button id="btn-rl-back-lobby" type="button" class="pixel-btn btn-slate btn-sm">LOBBY</button>
+        <button id="btn-rl-arena-rules" type="button" class="pixel-btn btn-sm">REGRAS</button>
+      </div>
+
+      <div class="hud-group">
+        <div class="stat-box">
+          <div class="stat-label">RODADA</div>
+          <div id="rl-round-num" class="stat-value">1</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">SOBREVIVENTES</div>
+          <div id="rl-alive-count" class="stat-value lime">5/5</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">TEMPO</div>
+          <div id="rl-timer" class="stat-value cyan">40s</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">SEU IP</div>
+          <div id="rl-arena-ip" class="stat-value">-</div>
+        </div>
+      </div>
+
+      <div class="hud-group">
+        <button id="btn-rl-arena-bgm" type="button" class="pixel-btn btn-slate btn-sm">BGM: ON</button>
+        <button id="btn-rl-arena-sfx" type="button" class="pixel-btn btn-slate btn-sm">SFX: ON</button>
+      </div>
+    </header>
+
+    <section class="playfield roulette-playfield">
+      <!-- Palco Central do Revólver -->
+      <div class="arena-center pixel-panel-gold">
+        <div class="arena-revolver-wrap">
+          <img id="rl-revolver-img" src="assets/revolver_idle.png" alt="Revólver" class="pixel-img arena-revolver" />
+        </div>
+        <div class="arena-info">
+          <div id="rl-phase-banner" class="status-banner">SUA VEZ NAS CARTAS</div>
+          <div id="rl-shot-detail" class="shot-detail">
+            Quem vencer a mão de 21 escolhe um adversário para puxar o gatilho!
+          </div>
+          <div class="actions-row" id="rl-arena-actions">
+            <button id="btn-rl-hit" type="button" class="pixel-btn btn-green">PEDIR CARTA</button>
+            <button id="btn-rl-stand" type="button" class="pixel-btn btn-red">PARAR MÃO</button>
+            <button id="btn-rl-next" type="button" class="pixel-btn btn-gold hidden">PRÓXIMA RODADA</button>
+            <button id="btn-rl-rematch" type="button" class="pixel-btn btn-gold hidden">VOLTAR AO LOBBY</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 Assentos dos Jogadores -->
+      <div id="rl-seats-grid" class="seats-grid"></div>
+
+      <!-- Registro de Eventos da Rede -->
+      <div class="arena-log pixel-panel">
+        <div class="arena-log-title">REGISTRO DA MESA (TEMPO REAL)</div>
+        <ul id="rl-log-list" class="arena-log-list"></ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL DE REGRAS (BLACKJACK SOLO) -->
+  <div id="rules-modal" class="modal-backdrop hidden">
+    <div class="modal-box pixel-panel-gold">
+      <div class="modal-title">
+        <img src="assets/crown.png" alt="Coroa" class="pixel-img" style="width: 32px; height: 32px;" />
+        <span>REGRAS DO BLACKJACK 21</span>
+      </div>
+
+      <ul class="rules-list">
+        <li><strong>Objetivo:</strong> Chegar o mais perto possível de <strong>21 pontos</strong> sem ultrapassar (estourar) e vencer a mão do Crupiê.</li>
+        <li><strong>Valores das Cartas:</strong> Cartas de 2 a 10 valem seu número; <strong>J, Q e K</strong> valem <strong>10</strong>; o <strong>Ás (A)</strong> vale <strong>1 ou 11</strong> (o que for melhor).</li>
+        <li><strong>Blackjack Natural:</strong> Um Ás + uma carta de valor 10 logo nas 2 primeiras cartas paga <strong>3:2</strong> (ex: aposta $100 ganha $150 de lucro).</li>
+        <li><strong>Ações na Sua Vez:</strong> <strong>Pedir (Hit)</strong> compra mais uma carta; <strong>Parar (Stand)</strong> encerra sua mão; <strong>Dobrar (2x)</strong> dobra a aposta e compra exatamente 1 carta; <strong>Dividir (Split)</strong> separa um par inicial em duas mãos.</li>
+        <li><strong>Seguro (Insurance):</strong> Quando o Crupiê mostra um Ás, você pode apostar metade da aposta como seguro. Se ele tiver Blackjack, o seguro paga 2:1.</li>
+        <li><strong>Regra da Banca:</strong> O Crupiê compra cartas até atingir <strong>17 ou mais</strong> (ele sempre para no 17).</li>
+      </ul>
+
+      <button id="btn-close-rules" type="button" class="pixel-btn btn-gold">ENTENDI, VOLTAR</button>
+    </div>
+  </div>
+
+  <!-- MODAL DE REGRAS (ROLETA RUSSA ONLINE) -->
+  <div id="roulette-rules-modal" class="modal-backdrop hidden">
+    <div class="modal-box pixel-panel-gold">
+      <div class="modal-title">
+        <img src="assets/revolver_idle.png" alt="Revólver" class="pixel-img" style="width: 48px; height: 32px;" />
+        <span>REGRAS: ROLETA RUSSA 21 (ONLINE)</span>
+      </div>
+
+      <ul class="rules-list">
+        <li><strong>Até 5 Jogadores na Rede:</strong> Cada máquina entra com seu <strong>Nick</strong> e escolhe uma das 5 skins exclusivas. O servidor reconhece o IP e sistema de cada participante.</li>
+        <li><strong>3 Vidas por Jogador:</strong> Todos começam com <strong>3 corações</strong> e um tambor próprio de 6 câmaras com 1 bala (chance inicial <strong>1/6</strong>).</li>
+        <li><strong>Rodada de Blackjack:</strong> Todos os vivos jogam suas cartas tentando chegar o mais perto de <strong>21</strong> sem estourar.</li>
+        <li><strong>Hora do Disparo:</strong> Quem fizer a melhor mão da rodada escolhe <strong>qual adversário vai encarar o revólver</strong>!</li>
+        <li><strong>Probabilidade Crescente (1/6 → 1/5 → 1/4...):</strong> Se o tiro falhar (<em>*CLIQUE*</em>), o alvo sobrevive, mas a chance do seu próprio tambor sobe para <strong>1/5</strong>, depois <strong>1/4</strong>, <strong>1/3</strong>, <strong>1/2</strong> até <strong>1/1</strong>! Quando a bala dispara, o alvo perde 1 vida e o tambor volta para <strong>1/6</strong> (se ainda tiver vidas).</li>
+        <li><strong>Vitória:</strong> O último sobrevivente vence a partida!</li>
+      </ul>
+
+      <button id="btn-close-rl-rules" type="button" class="pixel-btn btn-gold">FECHAR REGRAS</button>
+    </div>
+  </div>
+
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
+  <script src="online.js"></script>
+</body>
+</html>
