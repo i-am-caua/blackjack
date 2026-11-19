@@ -1,5 +1,10 @@
 /**
  * Pixel Blackjack 21 — Modo Online LAN: Roleta Russa (até 5 jogadores)
+ *
+ * Inclui o sistema de habilidades de HABILIDADES.md:
+ *  - painel permanente (passiva / carga / ativa);
+ *  - janela de preparação de 8s;
+ *  - alvos destacados, chips de estado e efeitos de habilidade.
  */
 (function (global) {
   "use strict";
@@ -12,6 +17,87 @@
     boss: "Don",
     phantom: "Reaper",
   };
+
+  // Usado apenas se o servidor ainda não enviou o kit (ex.: primeira conexão).
+  const FALLBACK_KITS = {
+    outlaw: {
+      name: "Billy",
+      role: "Pistoleiro",
+      passive: ["MÃO DO DIABO", "Mão inicial 16 → −1 bala"],
+      charge: ["AZAR DO PISTOLEIRO", "3 estouros seguidos = ficha"],
+      active: ["MUNIÇÃO TURBINADA", "Marca um alvo: o próximo tiro dele causa 2 de dano"],
+      marksMax: 3,
+    },
+    duchess: {
+      name: "Viper",
+      role: "Duquesa",
+      passive: ["PULSO FIRME", "75% de não subir a bala no 1/6 (1× por vida)"],
+      charge: ["SANGUE FRIO", "Sobreviver a um giro em 4/6 ou 5/6 = ficha"],
+      active: ["ROLETA DE CABEÇAS", "Sorteia alguém: +1 bala e roleta"],
+      marksMax: 0,
+    },
+    cyber: {
+      name: "Zero",
+      role: "Forasteiro",
+      passive: ["ESPIADA", "Mão inicial 12–16 revela a próxima carta"],
+      charge: ["BARALHO MARCADO", "1 ficha a cada 5 rodadas"],
+      active: ["CURTO-CIRCUITO", "Troca uma carta com um alvo"],
+      marksMax: 0,
+    },
+    boss: {
+      name: "Don",
+      role: "Chefão",
+      passive: ["PALAVRA FINAL", "Com um 7 na mão, empate é vitória sua"],
+      charge: ["SETE DA SORTE", "7 na mão inicial = marca (2 = ficha)"],
+      active: ["GUARDA-COSTAS", "Capanga morre no seu lugar, você fica com 1 vida"],
+      marksMax: 2,
+    },
+    phantom: {
+      name: "Reaper",
+      role: "Morto-Vivo",
+      passive: ["ESPECTRO", "Com 1 vida, o tambor nunca passa de 2/6"],
+      charge: ["SEDE DE SANGUE", "3 BANGs = ficha"],
+      active: ["SANGUE POR SANGUE", "Paga 1 vida: Maldição, Selo de Chumbo ou Boneco Vudú"],
+      marksMax: 3,
+    },
+  };
+
+  const ABILITY_DETAILS = {
+    outlaw: {
+      passive: "Só a mão inicial de duas cartas que totalize 16 duro ativa. Ás conta como 1; mão macia não ativa. Remove 1 bala, sem descer de 1/6, e não gasta ficha.",
+      charge: "Cada estouro no Blackjack dá uma marca. Três estouros seguidos geram 1 ficha, no máximo 1 guardada. A sequência zera ao vencer uma rodada, fazer Blackjack ou usar a ativa.",
+      active: "Na janela de preparação, gasta 1 ficha e marca qualquer jogador vivo. No próximo giro dele, BANG causa 2 de dano; clique também consome a marca. Pode eliminar com 2 vidas. Não acumula, o alvo é avisado e uma marca em alguém que morre antes de girar é perdida.",
+    },
+    duchess: {
+      passive: "Uma vez por vida, o primeiro giro iniciado exatamente em 1/6 tem 75% de chance de manter o tambor em 1/6; se falhar, sobe para 2/6. O sorteio e o resultado são públicos. Reseta quando perde uma vida.",
+      charge: "Uma vez por partida, ganha 1 ficha se sobreviver de verdade a um giro iniciado em 4/6 ou 5/6. Conta a chance antes do disparo; clique ou BANG não fatal contam.",
+      active: "Só quando a Viper for escolhida para girar. Na preparação, gasta 1 ficha e sorteia um jogador vivo, podendo sortear a si mesma. Ela gira primeiro; o sorteado recebe +1 bala (máximo 6/6) e gira depois, mesmo que ela morra. A ficha é consumida mesmo se o sorteado for ela; sem ativar, fica guardada.",
+    },
+    cyber: {
+      passive: "Com mão inicial de 12 a 16, reserva a próxima carta e mostra só ao Zero se ela é SEGURA ou PERIGOSA; Ás nunca estoura. Vale para a primeira compra e desaparece após Hit ou Stand.",
+      charge: "Ganha 1 ficha nas rodadas 5, 10, 15, 20... O contador não reinicia e continua mesmo com a ficha cheia; máximo 1 guardada. É a única ativa reutilizável na mesma partida.",
+      active: "Na fase de cartas, escolhe outro jogador vivo com cartas, recebe uma carta aleatória dele e entrega uma carta própria escolhida. Pode usar depois de estourar enquanto a rodada estiver aberta. Recalcula os pontos na hora e não devolve a ação a quem já parou ou estourou; o alvo é avisado.",
+    },
+    boss: {
+      passive: "Enquanto tiver um 7 na mão, qualquer empate que inclua o Don é vitória só dele; os outros empatados não vencem. Vale para 7 inicial ou comprado, sem clique nem custo.",
+      charge: "Um 7 na mão inicial dá 1 marca SETES. Com 2 marcas, arma automaticamente o Guarda-Costas. Máximo 1 ficha por partida.",
+      active: "Arma automaticamente e fica secreto, visível só ao Don. No primeiro tiro fatal (dano ≥ vidas), o capanga absorve: Don fica com 1 vida, tambor em 3/6 e ficha consumida. Não protege contra dano não fatal e só salva uma vez por partida.",
+    },
+    phantom: {
+      passive: "Com exatamente 1 vida, o tambor final nunca passa de 2/6, mesmo após Selo, mínimo 4/6 ou +1 bala. O tiro acontece normalmente; não é escudo.",
+      charge: "Cada BANG em qualquer jogador dá 1 marca, inclusive os absorvidos pelo Guarda-Costas e os que acertam o Reaper. Três marcas geram 1 ficha; guarda no máximo 1. A vida limita o uso a duas vezes por partida.",
+      active: "Só na preparação; custa 1 vida e exige 2 ou mais, além de gastar a ficha. Maldição força outro jogador vivo a girar imediatamente com mínimo 4/6 e depois volta o tambor a 1/6 (Guarda-Costas deixa 3/6). Selo dá +1 bala a cada giro do alvo até o fim da partida, máximo 6/6. Boneco só quando o Reaper vai girar: ele gira normalmente primeiro; outro vivo gira depois com mínimo 4/6, mesmo se o Reaper morrer.",
+    },
+  };
+
+  // Reação central acompanha quase toda a pausa do revólver após o giro.
+  const SHOT_REACTION_MS = 3600;
+
+  function tombstoneImage(skin) {
+    const knownSkins = new Set(["outlaw", "duchess", "cyber", "boss", "phantom"]);
+    const safeSkin = knownSkins.has(skin) ? skin : "outlaw";
+    return `assets/lapide_${safeSkin}.png?v=lapides-v1`;
+  }
 
   function getClientId() {
     let cid = sessionStorage.getItem("pixel_bj_client_id");
@@ -31,8 +117,32 @@
     lastState: null,
     lastShotSeq: 0,
     shotAnimUntil: 0,
+    shotResultAt: 0,
+    activeShotSeq: 0,
     shotAnimTimer: null,
+    shotReactionTimer: null,
+    shotStageStep: "IDLE",
+    shotFlashTimer: null,
+    happySeatId: null,
+    happySeatUntil: 0,
+    happyEventKey: "",
+    happyTimer: null,
+    winnerHappyKey: "",
+    winnerScreenKey: "",
+    winnerScreenDeadline: 0,
+    winnerScreenTimer: null,
     serverOffline: false,
+    // Habilidades
+    lastAbilitySeq: 0,
+    abilityFx: null,
+    abilityFxTimer: null,
+    toast: null,
+    toastTimer: null,
+    prepKey: "",
+    prepReadySent: false,
+    panelOpen: true,
+    panelUserToggled: false,
+    abilityModalOpen: false,
   };
 
   const el = {
@@ -58,6 +168,7 @@
 
     nickInput: document.getElementById("rl-nick-input"),
     btnJoin: document.getElementById("btn-rl-join"),
+    lobbyNotice: document.getElementById("rl-lobby-notice"),
     skinCards: Array.from(document.querySelectorAll(".skin-card")),
     lobbyPlayers: document.getElementById("rl-lobby-players"),
     networkDevices: document.getElementById("rl-network-devices"),
@@ -81,8 +192,88 @@
     btnNext: document.getElementById("btn-rl-next"),
     btnRematch: document.getElementById("btn-rl-rematch"),
 
+    // Janela de preparação
+    prepBox: document.getElementById("rl-prep-box"),
+    prepTimer: document.getElementById("rl-prep-timer"),
+    prepHint: document.getElementById("rl-prep-hint"),
+    prepReadyList: document.getElementById("rl-prep-ready-list"),
+    btnReady: document.getElementById("btn-rl-ready"),
+
+    // Painel de habilidade
+    abilityPanel: document.getElementById("rl-ability-panel"),
+    abilityToggle: document.getElementById("rl-ability-toggle"),
+    abilityPortrait: document.getElementById("rl-ability-portrait"),
+    abilityToggleName: document.getElementById("rl-ability-toggle-name"),
+    abilityTogglePassive: document.getElementById("rl-ability-toggle-passive"),
+    abilityToggleArrow: document.getElementById("rl-ability-toggle-arrow"),
+    abilityBody: document.getElementById("rl-ability-body"),
+    abilPassiveIcon: document.getElementById("rl-abil-passive-icon"),
+    abilPassiveName: document.getElementById("rl-abil-passive-name"),
+    abilPassiveDesc: document.getElementById("rl-abil-passive-desc"),
+    abilChargeIcon: document.getElementById("rl-abil-charge-icon"),
+    abilChargeName: document.getElementById("rl-abil-charge-name"),
+    abilChargeDesc: document.getElementById("rl-abil-charge-desc"),
+    abilMarksWrap: document.getElementById("rl-abil-marks-wrap"),
+    abilMarksText: document.getElementById("rl-abil-marks-text"),
+    abilBarFill: document.getElementById("rl-abil-bar-fill"),
+    abilActiveIcon: document.getElementById("rl-abil-active-icon"),
+    abilActiveName: document.getElementById("rl-abil-active-name"),
+    abilActiveDesc: document.getElementById("rl-abil-active-desc"),
+    abilFichaText: document.getElementById("rl-abil-ficha-text"),
+    abilUse: document.getElementById("rl-abil-use"),
+    abilEffect: document.getElementById("rl-abil-effect"),
+    espiadaBox: document.getElementById("rl-espiada"),
+    espiadaIcon: document.getElementById("rl-espiada-icon"),
+    espiadaText: document.getElementById("rl-espiada-text"),
+
+    // Modal de habilidade
+    abilityModal: document.getElementById("rl-ability-modal"),
+    abilityModalTitle: document.getElementById("rl-ability-modal-title"),
+    abilityModalText: document.getElementById("rl-ability-modal-text"),
+    abilityModalOptions: document.getElementById("rl-ability-modal-options"),
+    abilityModalCancel: document.getElementById("rl-ability-modal-cancel"),
+
     seatsGrid: document.getElementById("rl-seats-grid"),
     logList: document.getElementById("rl-log-list"),
+    characterDetails: document.getElementById("rl-character-details"),
+
+    shotOverlay: document.getElementById("rl-shot-overlay"),
+    shotOverlayTitle: document.getElementById("rl-shot-overlay-title"),
+    shotOverlayDetail: document.getElementById("rl-shot-overlay-detail"),
+    shotOverlayDrum: document.getElementById("rl-shot-overlay-drum"),
+    shotOverlayGun: document.getElementById("rl-shot-overlay-gun"),
+    shotOverlayCharacter: document.getElementById("rl-shot-overlay-character"),
+    shotOverlayName: document.getElementById("rl-shot-overlay-name"),
+    shotOverlayFx: document.getElementById("rl-shot-overlay-fx"),
+    shotFlash: document.getElementById("rl-shot-flash"),
+    winnerPanel: document.getElementById("rl-winner-panel"),
+    winnerPortrait: document.getElementById("rl-winner-portrait"),
+    winnerName: document.getElementById("rl-winner-name"),
+    winnerRole: document.getElementById("rl-winner-role"),
+    winnerSprite: document.getElementById("rl-winner-sprite"),
+  };
+
+  function buildArenaLayout() {
+    const playfield = document.querySelector("#roulette-screen .roulette-playfield");
+    const center = playfield && playfield.querySelector(".arena-center");
+    if (!playfield || !center || !el.abilityPanel || !el.seatsGrid || !el.winnerPanel) return;
+
+    const mainColumn = document.createElement("div");
+    mainColumn.className = "arena-main-column";
+    playfield.insertBefore(el.abilityPanel, center);
+    playfield.insertBefore(mainColumn, center);
+    mainColumn.append(center, el.winnerPanel, el.shotOverlay, el.seatsGrid);
+  }
+
+  buildArenaLayout();
+
+  const ABILITY_FX_DURATION = {
+    fx_municao: 1600,
+    fx_roletas: 1600,
+    fx_selo: 1600,
+    fx_maldicao: 1600,
+    fx_boneco: 1600,
+    fx_curto: 1400,
   };
 
   function syncAudioButtons() {
@@ -101,11 +292,13 @@
       menuSfx.classList.toggle("btn-slate", !sfxOn);
     }
     [el.btnLobbyBgm, el.btnArenaBgm].forEach((b) => {
+      if (!b) return;
       b.textContent = `BGM: ${bgmOn ? "ON" : "OFF"}`;
       b.classList.toggle("btn-green", bgmOn);
       b.classList.toggle("btn-slate", !bgmOn);
     });
     [el.btnLobbySfx, el.btnArenaSfx].forEach((b) => {
+      if (!b) return;
       b.textContent = `SFX: ${sfxOn ? "ON" : "OFF"}`;
       b.classList.toggle("btn-green", sfxOn);
       b.classList.toggle("btn-slate", !sfxOn);
@@ -131,9 +324,59 @@
     return data;
   }
 
-  function updateSkinSelectionUI() {
+  function skinOwner(skin, players) {
+    return (players || []).find((player) =>
+      player.id !== rl.clientId && player.skin === skin
+    ) || null;
+  }
+
+  function showLobbyNotice(message) {
+    if (!el.lobbyNotice) return;
+    el.lobbyNotice.textContent = message || "";
+    el.lobbyNotice.classList.toggle("hidden", !message);
+  }
+
+  function updateSkinSelectionUI(players) {
+    const roster = players || (rl.lastState && rl.lastState.players) || [];
     el.skinCards.forEach((card) => {
-      card.classList.toggle("active", card.dataset.skin === rl.skin);
+      const owner = skinOwner(card.dataset.skin, roster);
+      const active = card.dataset.skin === rl.skin && !owner;
+      let badge = card.querySelector(".skin-availability");
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "skin-availability hidden";
+        badge.setAttribute("aria-live", "polite");
+        card.appendChild(badge);
+      }
+      badge.textContent = owner ? `JÁ ESCOLHIDO · ${owner.nick}` : "";
+      badge.classList.toggle("hidden", !owner);
+      card.classList.toggle("unavailable", !!owner);
+      card.classList.toggle("active", active);
+      card.setAttribute("aria-pressed", active ? "true" : "false");
+      card.setAttribute("aria-disabled", owner ? "true" : "false");
+    });
+    syncSharedCharacterDetails(rl.skin);
+  }
+
+  function syncSharedCharacterDetails(skin) {
+    const panel = el.characterDetails;
+    if (!panel || panel.classList.contains("hidden")) return;
+    const detailSkin = skin || panel.dataset.skin || rl.skin;
+    const selected = el.skinCards.find((card) => card.dataset.skin === detailSkin);
+    const source = selected && selected.querySelector(".char-details");
+    if (!source) return;
+    panel.innerHTML = source.innerHTML;
+    panel.dataset.skin = selected.dataset.skin;
+    const title = document.createElement("div");
+    title.className = "shared-detail-title";
+    const name = selected.querySelector(".char-name");
+    const role = selected.querySelector(".char-role");
+    title.textContent = (name ? name.textContent : selected.dataset.skin)
+      + (role ? " · " + role.textContent : "");
+    panel.prepend(title);
+    el.skinCards.forEach((card) => {
+      const button = card.querySelector(".char-details-btn");
+      if (button) button.textContent = card.dataset.skin === detailSkin ? "OCULTAR DETALHES" : "VER DETALHES";
     });
   }
 
@@ -182,6 +425,22 @@
         skin: rl.skin,
       });
       rl.serverOffline = false;
+      if (!data.ok) {
+        const joinedPlayer = (data.players || []).find((player) => player.id === rl.clientId);
+        if (joinedPlayer) {
+          rl.skin = joinedPlayer.skin;
+          localStorage.setItem("pixel_bj_skin", rl.skin);
+        }
+        showLobbyNotice(data.message || "N\u00e3o foi poss\u00edvel escolher esse personagem.");
+        applyServerState(data);
+        return;
+      }
+      showLobbyNotice("");
+      const joinedPlayer = (data.players || []).find((player) => player.id === rl.clientId);
+      if (joinedPlayer) {
+        rl.skin = joinedPlayer.skin;
+        localStorage.setItem("pixel_bj_skin", rl.skin);
+      }
       applyServerState(data);
     } catch (_) {
       rl.serverOffline = true;
@@ -203,37 +462,399 @@
   }
 
   function playShotAnimationSequence(shot) {
-    rl.shotAnimUntil = Date.now() + 2600;
+    const spinDuration = 4200;
+    const totalDuration = 8500;
+    rl.shotStageStep = "SPIN";
+    rl.shotResultAt = Date.now() + spinDuration;
+    rl.shotAnimUntil = Date.now() + totalDuration;
     if (rl.shotAnimTimer) clearTimeout(rl.shotAnimTimer);
+    if (rl.shotReactionTimer) clearTimeout(rl.shotReactionTimer);
+    rl.shotReactionTimer = null;
 
-    // Step 1: Aim + Spin
-    el.revolverImg.src = "assets/revolver_spin.gif";
+    // No computador, a cena acontece no espaço central da mesa.
+    el.revolverImg.src = "assets/revolver_idle.png";
+    el.revolverImg.classList.remove("self-aim");
     AudioFX.playCylinderSpin();
     renderArena(rl.lastState, "SPIN");
 
     rl.shotAnimTimer = setTimeout(() => {
+      rl.shotStageStep = "RESULT";
       if (shot.fired) {
-        el.revolverImg.src = "assets/revolver_bang.png";
         AudioFX.playGunshot();
+        if (shot.guardAbsorbed) {
+          showSeatHappy(shot.shooterId, `guard:${shot.seq}`);
+        } else if (shot.chooserId && shot.chooserId !== shot.shooterId) {
+          showSeatHappy(shot.chooserId, `shot:${shot.seq}`);
+        }
+        if (window.innerWidth > 960) triggerShotFlash();
         if (shot.eliminated) {
           setTimeout(() => AudioFX.playEliminated(), 320);
         }
       } else {
-        el.revolverImg.src = "assets/revolver_click.png";
         AudioFX.playDryFire();
       }
       renderArena(rl.lastState, "RESULT");
-    }, 950);
+      rl.shotReactionTimer = window.setTimeout(() => {
+        rl.shotReactionTimer = null;
+        if (
+          rl.activeShotSeq === Number(shot.seq) &&
+          rl.lastState &&
+          rl.lastState.phase === "ROULETTE_SHOT" &&
+          rl.lastState.lastShot &&
+          Number(rl.lastState.lastShot.seq) === Number(shot.seq)
+        ) {
+          renderArena(rl.lastState, "RESULT");
+        }
+      }, SHOT_REACTION_MS);
+      if (shot.guardAbsorbed) playOneShotFx(el.shotOverlayFx, "fx_guarda", 450);
+    }, spinDuration);
+  }
+
+  function triggerShotFlash() {
+    if (!el.shotFlash) return;
+    if (rl.shotFlashTimer) clearTimeout(rl.shotFlashTimer);
+    el.shotFlash.classList.remove("hidden", "active");
+    void el.shotFlash.offsetWidth;
+    el.shotFlash.classList.add("active");
+    rl.shotFlashTimer = window.setTimeout(() => {
+      el.shotFlash.classList.remove("active");
+      el.shotFlash.classList.add("hidden");
+    }, 260);
+  }
+
+  function playOneShotFx(imgEl, fxName, ms) {
+    if (!imgEl) return;
+    imgEl.src = `assets/fx/${fxName}.gif?t=${Date.now()}`;
+    imgEl.classList.remove("hidden");
+    window.setTimeout(() => {
+      imgEl.classList.add("hidden");
+      imgEl.removeAttribute("src");
+    }, ms || 500);
+  }
+
+  function shotSourceLabel(shot) {
+    if (!shot) return "";
+    if (shot.curse) return "MALDICÃO";
+    if (shot.source && shot.source !== "RODADA") return shot.source;
+    return "";
+  }
+
+  function feedMeta(line) {
+    const text = String(line || "");
+    const upper = text.toLocaleUpperCase("pt-BR");
+    if (/^RODADA\s+\d+/i.test(text)) {
+      return { tone: "round", label: "RODADA", icon: "assets/ui/icon_marca.png", divider: true };
+    }
+    if (upper.includes("MUNI") && upper.includes("TURBINADA")) {
+      return { tone: "outlaw", label: "BILLY · ATIVA", icon: "assets/ui/abil_outlaw_ativa.png" };
+    }
+    if (upper.includes("ROLETA DE CABE")) {
+      return { tone: "duchess", label: "VIPER · ATIVA", icon: "assets/ui/abil_duchess_ativa.png" };
+    }
+    if (upper.includes("CURTO-CIRCUITO")) {
+      return { tone: "cyber", label: "ZERO · ATIVA", icon: "assets/ui/abil_cyber_ativa.png" };
+    }
+    if (upper.includes("GUARDA-COSTAS")) {
+      return { tone: "boss", label: "DON · GUARDA", icon: "assets/ui/icon_status_guarda.png" };
+    }
+    if (upper.includes("SETE DA SORTE")) {
+      return { tone: "boss", label: "DON · CARGA", icon: "assets/ui/abil_boss_carga.png" };
+    }
+    if (upper.includes("PALAVRA FINAL")) {
+      return { tone: "boss", label: "DON · PASSIVA", icon: "assets/ui/abil_boss_passiva.png" };
+    }
+    if (upper.includes("SELO DE CHUMBO")) {
+      return { tone: "phantom", label: "REAPER · SELO", icon: "assets/ui/icon_status_selo.png" };
+    }
+    if (upper.includes("MALDI") || upper.includes("BONECO VUD")) {
+      return { tone: "phantom", label: "REAPER · ATIVA", icon: "assets/ui/abil_phantom_ativa.png" };
+    }
+    if (upper.includes("PULSO FIRME")) {
+      return { tone: "duchess", label: "VIPER · PASSIVA", icon: "assets/ui/abil_duchess_passiva.png" };
+    }
+    if (upper.includes("SANGUE FRIO")) {
+      return { tone: "duchess", label: "VIPER · CARGA", icon: "assets/ui/abil_duchess_carga.png" };
+    }
+    if (upper.includes("AZAR DO PISTOLEIRO")) {
+      return { tone: "outlaw", label: "BILLY · CARGA", icon: "assets/ui/abil_outlaw_carga.png" };
+    }
+    if (upper.includes("DO DIABO")) {
+      return { tone: "outlaw", label: "BILLY · PASSIVA", icon: "assets/ui/abil_outlaw_passiva.png" };
+    }
+    if (upper.includes("BARALHO MARCADO")) {
+      return { tone: "cyber", label: "ZERO · CARGA", icon: "assets/ui/abil_cyber_carga.png" };
+    }
+    if (upper.includes("ESPIADA")) {
+      return { tone: "cyber", label: "ZERO · PASSIVA", icon: "assets/ui/abil_cyber_passiva.png" };
+    }
+    if (upper.includes("ESPECTRO")) {
+      return { tone: "phantom", label: "REAPER · PASSIVA", icon: "assets/ui/abil_phantom_passiva.png" };
+    }
+    if (upper.includes("SEDE DE SANGUE")) {
+      return { tone: "phantom", label: "REAPER · CARGA", icon: "assets/ui/abil_phantom_carga.png" };
+    }
+    if (upper.includes("SANGUE POR SANGUE")) {
+      return { tone: "phantom", label: "REAPER · ATIVA", icon: "assets/ui/abil_phantom_ativa.png" };
+    }
+    if (upper.includes("BANG!")) {
+      return { tone: "danger", label: "BANG", icon: "assets/revolver_bang.png" };
+    }
+    if (upper.includes("CLIQUE")) {
+      return { tone: "safe", label: "CLIQUE", icon: "assets/revolver_click.png" };
+    }
+    if (upper.includes("JANELA DE PREPARA")) {
+      return { tone: "prep", label: "PREPARAÇÃO", icon: "assets/ui/icon_status_marcado.png" };
+    }
+    if (upper.includes("FIM DE JOGO") || upper.includes("VENCEDOR")) {
+      return { tone: "result", label: "RESULTADO", icon: "assets/ui/icon_ficha.png" };
+    }
+    return { tone: "neutral", label: "MESA", icon: "assets/ui/icon_marca.png" };
+  }
+
+  function renderArenaFeed(logs, data, animStep) {
+    const sourceLogs = logs || [];
+    const spinningShot = data
+      && data.phase === "ROULETTE_SHOT"
+      && animStep === "SPIN"
+      && data.lastShot;
+    const spinningTarget = spinningShot
+      && (data.players || []).find((player) => player.id === data.lastShot.shooterId);
+    const targetNick = spinningTarget && String(spinningTarget.nick || "").toLocaleLowerCase("pt-BR");
+    const displayLogs = spinningTarget && targetNick
+      ? sourceLogs.filter((line) => {
+          const message = String(line || "");
+          const upper = message.toLocaleUpperCase("pt-BR");
+          const mentionsTarget = message.toLocaleLowerCase("pt-BR").includes(targetNick);
+          const currentShotOutcome =
+            upper.startsWith("BANG!")
+            || upper.startsWith("*CLIQUE*!")
+            || (upper.includes("GUARDA-COSTAS") && upper.includes("MORREU"))
+            || upper.startsWith("PULSO FIRME:")
+            || upper.startsWith("SANGUE FRIO:")
+            || upper.startsWith("SEDE DE SANGUE:");
+          return !(mentionsTarget && currentShotOutcome);
+        })
+      : sourceLogs;
+    const feedKey = JSON.stringify(displayLogs);
+    if (el.logList.dataset.feedKey === feedKey) return;
+    const previousTop = el.logList.scrollTop;
+    const wasNearNewest = previousTop < 28;
+    const fragment = document.createDocumentFragment();
+    displayLogs.forEach((line, index) => {
+      const meta = feedMeta(line);
+      const item = document.createElement("li");
+      item.className = meta.divider ? "feed-round" : "feed-item feed-" + meta.tone;
+      if (index === 0 && !meta.divider) item.classList.add("feed-latest");
+      const icon = document.createElement("img");
+      icon.className = "pixel-img feed-icon";
+      icon.src = meta.icon;
+      icon.alt = "";
+      icon.loading = "lazy";
+      const content = document.createElement("div");
+      content.className = "feed-content";
+      const label = document.createElement("span");
+      label.className = "feed-label";
+      label.textContent = meta.label;
+      const message = document.createElement("span");
+      message.className = "feed-message";
+      message.textContent = String(line || "");
+      content.append(label, message);
+      item.append(icon, content);
+      fragment.appendChild(item);
+    });
+    el.logList.replaceChildren(fragment);
+    el.logList.dataset.feedKey = feedKey;
+    el.logList.scrollTop = wasNearNewest ? 0 : previousTop;
+  }
+
+  function characterGif(skin, expression) {
+    return `assets/char_${skin}_${expression}.gif?v=shot-blood-animation-v1`;
+  }
+
+  function showSeatHappy(playerId, eventKey) {
+    if (!playerId || !eventKey || rl.happyEventKey === eventKey) return;
+    if (rl.happyTimer) clearTimeout(rl.happyTimer);
+
+    rl.happySeatId = playerId;
+    rl.happySeatUntil = Date.now() + 2000;
+    rl.happyEventKey = eventKey;
+    rl.happyTimer = window.setTimeout(() => {
+      if (rl.happyEventKey !== eventKey) return;
+      rl.happySeatId = null;
+      rl.happySeatUntil = 0;
+      rl.happyEventKey = "";
+      rl.happyTimer = null;
+      if (rl.lastState) {
+        const step = Date.now() < rl.shotAnimUntil ? rl.shotStageStep : "IDLE";
+        renderArena(rl.lastState, step);
+      }
+    }, 2000);
+  }
+
+  function showWinnerHappy(data, champion) {
+    if (data.phase !== "GAME_OVER" || !champion) return;
+    const key = `${champion.id}:${data.winnerScreenUntil || data.roundNum}`;
+    if (rl.winnerHappyKey === key) return;
+    rl.winnerHappyKey = key;
+    showSeatHappy(champion.id, `winner:${key}`);
+  }
+
+  function renderShotOverlay(data, animStep) {
+    const shot = data && data.lastShot;
+    const visible = data && data.phase === "ROULETTE_SHOT" && shot && animStep !== "IDLE";
+    if (!visible) {
+      el.shotOverlay.classList.add("hidden");
+      el.shotOverlayDrum.classList.remove("spinning");
+      return;
+    }
+
+    const target = (data.players || []).find((p) => p.id === shot.shooterId);
+    if (!target) return;
+
+    const bulletCount = Math.max(1, Math.min(6, shot.bulletCountBefore || 1));
+    const chamberIndex = Number(shot.chamberIndex || 0);
+    const finalAngle = -(chamberIndex * 60 + 1440);
+    const isSpin = animStep === "SPIN";
+    const sourceLabel = shotSourceLabel(shot);
+    const damageTxt = shot.damage === 2 ? " (dano 2)" : "";
+
+    el.shotOverlay.classList.remove("hidden");
+    el.shotOverlay.classList.toggle("shot-result", !isSpin);
+
+    if (isSpin) {
+      el.shotOverlayTitle.textContent = sourceLabel
+        ? `${sourceLabel}! ${target.nick} VAI GIRAR...`
+        : `${target.nick} FOI ESCOLHIDO...`;
+      el.shotOverlayDetail.textContent = shot.curse
+        ? `${shot.chooserNick} lançou a Maldição. O tambor tem no mínimo 4/6.`
+        : `${shot.chooserNick} escolheu ${target.nick}. A câmara está girando...`;
+    } else if (shot.guardAbsorbed) {
+      el.shotOverlayTitle.textContent = `GUARDA-COSTAS! ${target.nick} NÃO MORREU!`;
+      el.shotOverlayDetail.textContent =
+        `O capanga morreu no lugar dele. ${target.nick} ficou com 1 vida e o tambor foi para 3/6.`;
+    } else if (shot.fired && shot.eliminated) {
+      el.shotOverlayTitle.textContent = `BANG! ${target.nick} FOI ELIMINADO!`;
+      el.shotOverlayDetail.textContent =
+        `A câmara marcada pela seta tinha munição (${shot.oddsBefore})${damageTxt}. ${target.nick} saiu do jogo!`;
+    } else if (shot.fired) {
+      el.shotOverlayTitle.textContent = `BANG! ${target.nick} PERDEU ${shot.damage} VIDA${shot.damage > 1 ? "S" : ""}!`;
+      el.shotOverlayDetail.textContent =
+        `A câmara marcada pela seta tinha munição (${shot.oddsBefore})${damageTxt}. Restam ${shot.livesLeft} vidas.`;
+    } else {
+      el.shotOverlayTitle.textContent = `CLIQUE! ${target.nick} SOBREVIVEU!`;
+      const pulsoTxt = shot.pulso === "success"
+        ? " PULSO FIRME: a bala não subiu."
+        : shot.pulso === "fail"
+          ? " PULSO FIRME falhou."
+          : "";
+      el.shotOverlayDetail.textContent =
+        `A câmara marcada pela seta estava vazia (${shot.oddsBefore}).${pulsoTxt} Próxima chance: ${shot.oddsAfter}.`;
+    }
+
+    el.shotOverlayName.textContent = target.nick;
+
+    el.shotOverlayDrum.src = `assets/tambor/Tambor-${bulletCount}M.png`;
+    el.shotOverlayDrum.style.setProperty("--overlay-drum-angle", `${finalAngle}deg`);
+    el.shotOverlayDrum.classList.toggle("spinning", isSpin);
+    if (!isSpin) el.shotOverlayDrum.style.transform = `rotate(${finalAngle}deg)`;
+
+    el.shotOverlayGun.src = isSpin
+      ? "assets/revolver_spin.gif"
+      : shot.fired
+        ? "assets/revolver_bang.png"
+        : "assets/revolver_click.png";
+
+    if (isSpin) {
+      // O servidor já conhece o resultado, mas a animação não pode entregá-lo
+      // antes que a câmara pare.
+      el.shotOverlayCharacter.src = characterGif(target.skin, "scared");
+    } else if (shot.guardAbsorbed) {
+      el.shotOverlayCharacter.src = rl.happySeatId === target.id && Date.now() < rl.happySeatUntil
+        ? characterGif(target.skin, "happy")
+        : characterGif(target.skin, "idle");
+    } else if (shot.fired && shot.eliminated && Date.now() >= rl.shotResultAt + SHOT_REACTION_MS) {
+      el.shotOverlayCharacter.src = tombstoneImage(target.skin);
+    } else if (shot.fired) {
+      el.shotOverlayCharacter.src = Date.now() < rl.shotResultAt + SHOT_REACTION_MS
+        ? characterGif(target.skin, "shot")
+        : characterGif(target.skin, "idle");
+    } else {
+      el.shotOverlayCharacter.src = Date.now() < rl.shotResultAt + SHOT_REACTION_MS
+        ? characterGif(target.skin, "relieved")
+        : characterGif(target.skin, "idle");
+    }
+
+    if (!isSpin && !shot.guardAbsorbed) {
+      el.shotOverlayFx.classList.add("hidden");
+    }
+  }
+
+  function startShotAnimationIfNeeded(data) {
+    if (!data || data.phase !== "ROULETTE_SHOT" || !data.lastShot) return false;
+    const seq = Number(data.lastShot.seq || 0);
+    if (!seq || rl.activeShotSeq === seq) return false;
+
+    rl.activeShotSeq = seq;
+    rl.lastShotSeq = Math.max(rl.lastShotSeq, seq);
+    rl.lastState = data;
+    playShotAnimationSequence(data.lastShot);
+    return true;
+  }
+
+  function registerAbilityFx(data) {
+    const ab = data && data.lastAbility;
+    if (!ab || !ab.seq || ab.seq === rl.lastAbilitySeq) return false;
+    rl.lastAbilitySeq = ab.seq;
+    // Guarda-Costas só toca na cena do disparo; a imagem não deve aparecer
+    // uma segunda vez como FX genérico no assento.
+    if (ab.fx === "fx_guarda") return true;
+    const duration = ABILITY_FX_DURATION[ab.fx] || 1600;
+    rl.abilityFx = {
+      seq: ab.seq,
+      fx: ab.fx,
+      actorId: ab.actorId,
+      targetId: ab.targetId || null,
+      text: ab.text,
+      until: Date.now() + duration,
+    };
+    if (rl.abilityFxTimer) clearTimeout(rl.abilityFxTimer);
+    rl.abilityFxTimer = window.setTimeout(() => {
+      rl.abilityFx = null;
+      if (rl.lastState) renderArena(rl.lastState, "IDLE");
+    }, duration);
+    return true;
   }
 
   function applyServerState(data) {
     if (!data || !data.phase) return;
+    if (data.phase === "LOBBY") {
+      if (rl.shotReactionTimer) clearTimeout(rl.shotReactionTimer);
+      rl.shotReactionTimer = null;
+      rl.activeShotSeq = 0;
+      rl.lastShotSeq = 0;
+      rl.shotStageStep = "IDLE";
+      rl.lastAbilitySeq = 0;
+      rl.abilityFx = null;
+      rl.toast = null;
+      rl.prepKey = "";
+      rl.prepReadySent = false;
+      if (rl.happyTimer) clearTimeout(rl.happyTimer);
+      rl.happyTimer = null;
+      rl.happySeatId = null;
+      rl.happySeatUntil = 0;
+      rl.happyEventKey = "";
+      rl.winnerHappyKey = "";
+      if (rl.winnerScreenTimer) clearTimeout(rl.winnerScreenTimer);
+      rl.winnerScreenTimer = null;
+      rl.winnerScreenKey = "";
+      rl.winnerScreenDeadline = 0;
+      el.winnerPanel.classList.add("hidden");
+      el.arenaScreen.classList.remove("duel-spin-focus", "shot-stage-active");
+    }
     rl.lastState = data;
 
-    if (data.lastShot && data.lastShot.seq > rl.lastShotSeq) {
-      rl.lastShotSeq = data.lastShot.seq;
-      playShotAnimationSequence(data.lastShot);
-    }
+    registerAbilityFx(data);
+    const justStartedShot = startShotAnimationIfNeeded(data);
 
     const me = (data.players || []).find((p) => p.id === rl.clientId);
 
@@ -243,17 +864,35 @@
         el.lobbyScreen.classList.remove("hidden");
       }
       renderLobby(data);
-    } else {
-      if (el.arenaScreen.classList.contains("hidden") && rl.active) {
-        el.lobbyScreen.classList.add("hidden");
-        el.arenaScreen.classList.remove("hidden");
-      }
+      return;
+    }
+
+    if (el.arenaScreen.classList.contains("hidden") && rl.active) {
+      el.lobbyScreen.classList.add("hidden");
+      el.arenaScreen.classList.remove("hidden");
+    }
+
+    const shotStillAnimating =
+      data.phase === "ROULETTE_SHOT" &&
+      data.lastShot &&
+      Date.now() < rl.shotAnimUntil;
+    if (!justStartedShot && !shotStillAnimating) {
       const step = Date.now() < rl.shotAnimUntil ? "RESULT" : "IDLE";
+      if (step === "IDLE") rl.shotStageStep = "IDLE";
       renderArena(data, step);
+    } else if (
+      !justStartedShot &&
+      shotStillAnimating &&
+      Date.now() >= rl.shotResultAt &&
+      rl.shotStageStep === "SPIN"
+    ) {
+      rl.shotStageStep = "RESULT";
+      renderArena(data, "RESULT");
     }
   }
 
   function renderLobby(data) {
+    updateSkinSelectionUI(data.players);
     el.myDevice.textContent = `${data.viewerIp} • ${data.viewerPlatform}`;
     el.playerCount.textContent = `${data.players.length} / ${data.maxPlayers}`;
 
@@ -266,7 +905,7 @@
         row.className = "roster-row" + (p.id === rl.clientId ? " me" : "");
         row.innerHTML = `
           <div class="roster-left">
-            <img src="assets/char_${p.skin}_idle.gif" alt="${p.skin}" class="pixel-img" />
+            <img src="${characterGif(p.skin, "idle")}" alt="${p.skin}" class="pixel-img" />
             <div>
               <div class="roster-nick">${escapeHtml(p.nick)}${p.id === rl.clientId ? " (VOCÊ)" : ""}</div>
               <div class="roster-ip">${escapeHtml(p.ip)} • ${escapeHtml(p.platform)}</div>
@@ -294,32 +933,470 @@
   }
 
   function spriteForPlayer(p, data, animStep) {
-    if (!p.alive) return `assets/char_${p.skin}_dead.png`;
-    const shot = data.lastShot;
-    if (data.phase === "ROULETTE_SHOT" && shot) {
-      if (p.id === shot.shooterId) {
-        if (animStep === "SPIN") return `assets/char_${p.skin}_aim.png`;
-        if (shot.fired) return `assets/char_${p.skin}_shoot.png`;
-        return `assets/char_${p.skin}_aim.png`;
-      }
-      if (p.id === shot.targetId && animStep === "RESULT" && shot.fired) {
-        return `assets/char_${p.skin}_hit.png`;
-      }
+    const shot = data.phase === "ROULETTE_SHOT" && data.lastShot && data.lastShot.shooterId === p.id
+      ? data.lastShot
+      : null;
+    if (rl.happySeatId === p.id && Date.now() < rl.happySeatUntil) {
+      return characterGif(p.skin, "happy");
     }
-    if (data.phase === "CHOOSE_TARGET" && p.id === data.currentShooterId) {
-      return `assets/char_${p.skin}_aim.png`;
+    if (shot && animStep === "RESULT") {
+      if (shot.guardAbsorbed) {
+        return p.alive ? characterGif(p.skin, "idle") : tombstoneImage(p.skin);
+      }
+      if (shot.fired && shot.eliminated && Date.now() >= rl.shotResultAt + SHOT_REACTION_MS) {
+        return tombstoneImage(p.skin);
+      }
+      return characterGif(p.skin, "idle");
     }
-    return `assets/char_${p.skin}_idle.gif`;
+    if (shot && animStep === "SPIN") return characterGif(p.skin, "idle");
+    if (!p.alive) return tombstoneImage(p.skin);
+    return characterGif(p.skin, "idle");
   }
 
+  // ------------------------------------------------------------- habilidades
+  function kitFor(data, skin) {
+    return (data && data.kits && data.kits[skin]) || FALLBACK_KITS[skin] || null;
+  }
+
+  function showToast(message) {
+    if (!message) return;
+    rl.toast = { msg: message, until: Date.now() + 4200 };
+    if (rl.toastTimer) clearTimeout(rl.toastTimer);
+    rl.toastTimer = window.setTimeout(() => {
+      rl.toast = null;
+      if (rl.lastState) renderAbilityPanel(rl.lastState, rl.lastState.me);
+    }, 4200);
+  }
+
+  function abilityReason(me, phase, data) {
+    if (!me) return "Sem jogador";
+    if (me.skin === "boss") {
+      return me.guard ? "Armada" : (me.marks < 2 ? "2 setes para armar" : "Sem ficha");
+    }
+    if (me.ficha < 1) return "Sem ficha";
+    const flags = me.flags || {};
+    if (me.skin === "outlaw") return flags.municao ? "" : phase === "PREP" ? "Aguarde a etapa do Billy" : "Só na preparação";
+    if (me.skin === "duchess") return flags.roletas ? "" : phase === "PREP" ? "Aguarde sua etapa" : "Só quando for girar";
+    if (me.skin === "cyber") {
+      if (flags.curto) return "";
+      return phase === "PLAYING_CARDS" ? "Sem alvo com cartas" : "Só na fase de cartas";
+    }
+    if (me.skin === "phantom") {
+      if (flags.sangue) return "";
+      return phase === "PREP"
+        ? me.lives < 2 ? "Precisa de 2+ vidas" : "Aguarde a etapa do Reaper"
+        : "Só na preparação";
+    }
+    return "Indisponível";
+  }
+
+  function renderAbilityPanel(data, me) {
+    if (!data || !me) return;
+    const kit = kitFor(data, me.skin);
+    if (!kit) return;
+
+    const nameU = String(kit.name || "").toUpperCase();
+    const roleU = String(kit.role || "");
+    el.abilityPortrait.src = "assets/portrait_" + me.skin + ".png";
+    el.abilityPortrait.alt = kit.name || me.skin;
+    el.abilityToggleName.textContent = `${nameU} — ${roleU}`;
+    el.abilityTogglePassive.textContent = kit.passive ? kit.passive[0] : "";
+
+    el.abilPassiveIcon.src = `assets/ui/abil_${me.skin}_passiva.png`;
+    el.abilPassiveName.textContent = kit.passive ? kit.passive[0] : "";
+    el.abilPassiveDesc.textContent = kit.passive ? kit.passive[1] : "";
+
+    el.abilChargeIcon.src = `assets/ui/abil_${me.skin}_carga.png`;
+    el.abilChargeName.textContent = kit.charge ? kit.charge[0] : "";
+    el.abilChargeDesc.textContent = kit.charge ? kit.charge[1] : "";
+
+    el.abilActiveIcon.src = `assets/ui/abil_${me.skin}_ativa.png`;
+    el.abilActiveName.textContent = kit.active ? kit.active[0] : "";
+    el.abilActiveDesc.textContent = kit.active ? kit.active[1] : "";
+
+    // Progresso da carga
+    const marksMax = Number(me.marksMax || kit.marksMax || 0);
+    if (marksMax > 0) {
+      el.abilMarksWrap.classList.remove("hidden");
+      const marks = Math.max(0, Math.min(marksMax, Number(me.marks || 0)));
+      el.abilMarksText.textContent = `${marks}/${marksMax}`;
+      el.abilBarFill.style.width = `${Math.round((marks / marksMax) * 100)}%`;
+    } else {
+      el.abilMarksWrap.classList.add("hidden");
+    }
+
+    // Ficha / estado da ativa
+    let fichaTxt = "";
+    if (me.skin === "boss") {
+      fichaTxt = me.guard ? "GUARDA-COSTAS ARMADO" : (me.marks >= 2 ? "SEM FICHA" : "AGUARDANDO SETES");
+    } else {
+      fichaTxt = me.ficha > 0 ? "FICHA PRONTA" : "SEM FICHA";
+    }
+    el.abilFichaText.textContent = fichaTxt;
+
+    const reason = abilityReason(me, data.phase, data);
+    const canUse = !!me.alive && reason === "";
+    el.abilUse.disabled = !canUse;
+    el.abilUse.classList.toggle("ability-ready", canUse);
+    el.abilUse.textContent = canUse
+      ? "USAR"
+      : me.skin === "boss" && me.guard
+        ? "ARMADA"
+        : "USAR";
+
+    // Linha de efeito / aviso
+    const effectMsg = rl.toast && Date.now() < rl.toast.until
+      ? rl.toast.msg
+      : me.effect || "";
+    if (effectMsg) {
+      el.abilEffect.textContent = effectMsg;
+      el.abilEffect.classList.remove("hidden");
+      el.abilEffect.classList.toggle("toast", !!(rl.toast && Date.now() < rl.toast.until));
+    } else if (!canUse && reason) {
+      el.abilEffect.textContent = reason;
+      el.abilEffect.classList.remove("hidden");
+      el.abilEffect.classList.remove("toast");
+    } else {
+      el.abilEffect.classList.add("hidden");
+    }
+
+    // Espiada privada do Zero
+    if (me.skin === "cyber" && me.espiada) {
+      el.espiadaBox.classList.remove("hidden");
+      el.espiadaText.textContent = `ESPIADA: ${me.espiada}`;
+      el.espiadaIcon.src = me.espiada === "PERIGOSA"
+        ? "assets/ui/fx_espiada_perigosa.png"
+        : "assets/ui/fx_espiada_segura.png";
+      el.espiadaBox.classList.toggle("danger", me.espiada === "PERIGOSA");
+    } else {
+      el.espiadaBox.classList.add("hidden");
+    }
+  }
+
+  function applyPanelState() {
+    el.abilityBody.classList.toggle("hidden", !rl.panelOpen);
+    el.abilityPanel.classList.toggle("collapsed", !rl.panelOpen);
+    el.abilityToggle.setAttribute("aria-expanded", rl.panelOpen ? "true" : "false");
+    el.abilityToggleArrow.textContent = rl.panelOpen ? "▾" : "▸";
+  }
+
+  function renderPrep(data, me) {
+    const active = data.phase === "PREP";
+    if (!active) {
+      el.prepBox.classList.add("hidden");
+      rl.prepReadySent = false;
+      rl.prepKey = "";
+      return;
+    }
+
+    const key = `${data.roundNum}:${data.chooserId}:${data.targetId}`;
+    if (key !== rl.prepKey) {
+      rl.prepKey = key;
+      rl.prepReadySent = false;
+    }
+
+    el.prepBox.classList.remove("hidden");
+    el.prepTimer.textContent = `${data.timeLeft}s`;
+    el.prepBox.classList.toggle("urgent", data.timeLeft <= 3);
+
+    const target = data.players.find((p) => p.id === data.targetId);
+    const chooser = data.players.find((p) => p.id === data.chooserId);
+    const step = Number.isInteger(data.prepStage) ? data.prepStage : 4;
+    const actor = (data.players || []).find((p) => p.id === data.prepActorId);
+    const iAmActor = !!me && me.id === data.prepActorId;
+    const stepName = data.prepStageName || "CONFIRMAÇÃO FINAL";
+    if (step < 4 && iAmActor) {
+      el.prepHint.textContent = `ETAPA ${step + 1}/4 — SUA VEZ: ${stepName}. Use a habilidade ou pule esta etapa.`;
+      el.prepHint.className = "prep-hint warn";
+    } else if (step < 4) {
+      el.prepHint.textContent = `${stepName}: ${actor ? actor.nick : "aguardando"}. Você pode confirmar para pular suas ações.`;
+      el.prepHint.className = "prep-hint";
+    } else {
+      el.prepHint.textContent = `${chooser ? chooser.nick : "O vencedor"} escolheu ${target ? target.nick : "um alvo"}. Confirme quando estiver pronto; o disparo começa quando todos confirmarem ou o tempo acabar.`;
+      el.prepHint.className = "prep-hint";
+    }
+
+    const readyNames = (data.prepReadyIds || [])
+      .map((id) => {
+        const p = data.players.find((x) => x.id === id);
+        return p ? p.nick : null;
+      })
+      .filter(Boolean);
+    el.prepReadyList.textContent = readyNames.length
+      ? `PRONTOS: ${readyNames.join(", ")}`
+      : "PRONTOS: —";
+
+    const alreadyReady = (data.prepReadyIds || []).includes(rl.clientId);
+    el.btnReady.disabled = alreadyReady;
+    el.btnReady.textContent = alreadyReady ? "AGUARDANDO..." : iAmActor && step < 4 ? "PULAR ETAPA" : "PRONTO";
+  }
+
+  function openAbilityModal(title, text, options) {
+    el.abilityModalCancel.textContent = "CANCELAR";
+    el.abilityModalTitle.textContent = title;
+    el.abilityModalText.textContent = text || "";
+    el.abilityModalOptions.innerHTML = "";
+
+    (options || []).forEach((opt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "pixel-btn ability-option " + (opt.className || "btn-slate");
+      btn.disabled = !!opt.disabled;
+
+      const label = document.createElement("span");
+      label.className = "ability-option-label";
+      label.textContent = opt.label || "";
+      btn.appendChild(label);
+
+      if (opt.sub) {
+        const sub = document.createElement("span");
+        sub.className = "ability-option-sub";
+        sub.textContent = opt.sub;
+        btn.appendChild(sub);
+      }
+      btn.addEventListener("click", () => {
+        AudioFX.playClick();
+        opt.onClick && opt.onClick();
+      });
+      el.abilityModalOptions.appendChild(btn);
+    });
+
+    el.abilityModal.classList.remove("hidden");
+    rl.abilityModalOpen = true;
+  }
+
+  function closeAbilityModal() {
+    el.abilityModal.classList.add("hidden");
+    el.abilityModalCancel.textContent = "CANCELAR";
+    rl.abilityModalOpen = false;
+  }
+
+  function openAbilityInfo(kind) {
+    const data = rl.lastState;
+    const me = data && (data.players || []).find((p) => p.id === rl.clientId);
+    const kit = me && kitFor(data, me.skin);
+    const detail = me && ABILITY_DETAILS[me.skin] && ABILITY_DETAILS[me.skin][kind];
+    if (!kit || !detail) return;
+    const ability = kit[kind] && kit[kind][0] || "HABILIDADE";
+    openAbilityModal(ability, detail, []);
+    el.abilityModalCancel.textContent = "FECHAR";
+  }
+
+  async function performAbility(payload) {
+    closeAbilityModal();
+    AudioFX.ensureContext();
+    try {
+      const data = await apiPost("/api/roulette/ability", payload);
+      if (data && data.message) showToast(data.message);
+      if (data && data.phase) applyServerState(data);
+    } catch (_) {
+      showToast("Falha ao usar a habilidade.");
+    }
+  }
+
+  function aliveOpponents(data) {
+    return (data.players || []).filter((p) => p.alive && p.id !== rl.clientId);
+  }
+
+  function openBillyModal(data) {
+    const options = (data.players || []).filter((p) => p.alive).map((p) => ({
+      label: `${p.nick}`,
+      sub: `${SKIN_LABELS[p.skin] || p.skin} • ${p.lives} vida(s) • tambor ${p.odds}`,
+      className: "btn-slate",
+      onClick: () => performAbility({ kind: "municao", targetId: p.id }),
+    }));
+    if (!options.length) {
+      showToast("Nenhum alvo disponível.");
+      return;
+    }
+    openAbilityModal(
+      "MUNIÇÃO TURBINADA",
+      "Escolha quem será marcado. O próximo tiro desse alvo causa 2 de dano (o efeito é consumido mesmo se der clique).",
+      options
+    );
+  }
+
+  function openViperModal() {
+    openAbilityModal(
+      "ROLETA DE CABEÇAS",
+      "A Viper vai sortear um jogador vivo (pode ser ela mesma). O sorteado recebe +1 munição e gira depois dela. O sorteio é público.",
+      [{
+        label: "GIRAR A ROLETA",
+        sub: "Gasta 1 ficha",
+        className: "btn-gold",
+        onClick: () => performAbility({ kind: "roletas" }),
+      }]
+    );
+  }
+
+  function openZeroModal(data) {
+    const options = aliveOpponents(data)
+      .filter((p) => (p.hand || []).length > 0)
+      .map((p) => ({
+        label: `${p.nick}`,
+        sub: `${SKIN_LABELS[p.skin] || p.skin} • ${p.score.total} pontos`,
+        className: "btn-slate",
+        onClick: () => openZeroCardModal(data, p),
+      }));
+    if (!options.length) {
+      showToast("Nenhum alvo com cartas na mão.");
+      return;
+    }
+    openAbilityModal(
+      "CURTO-CIRCUITO — ESCOLHA O ALVO",
+      "Você recebe uma carta aleatória do alvo e entrega uma carta escolhida da sua mão.",
+      options
+    );
+  }
+
+  function openZeroCardModal(data, target) {
+    const mePlayer = data.players.find((p) => p.id === rl.clientId);
+    const hand = (mePlayer && mePlayer.hand) || [];
+    if (!hand.length) {
+      showToast("Você não tem cartas para trocar.");
+      return;
+    }
+    const options = hand.map((c, idx) => ({
+      label: `${c.rank} de ${c.suit ? c.suit.name : "?"}`,
+      sub: "Entregar esta carta",
+      className: "btn-slate",
+      onClick: () => performAbility({
+        kind: "curto",
+        targetId: target.id,
+        cardIndex: idx,
+      }),
+    }));
+    openAbilityModal(
+      `ENTREGAR CARTA PARA ${target.nick}`,
+      "A carta aleatória do alvo já está reservada para você. Escolha qual das suas cartas entregar.",
+      options
+    );
+  }
+
+  function openReaperModal(data) {
+    const mePlayer = data.players.find((p) => p.id === rl.clientId);
+    const options = [];
+    if (data.prepStage === 0) {
+      options.push({
+        label: "MALDIÇÃO",
+        sub: "Alvo gira agora com no mínimo 4/6",
+        className: "btn-red",
+        onClick: () => openReaperTargetModal(data, "maldicao", "MALDIÇÃO", "Escolha quem vai girar agora. O tambor dele terá no mínimo 4/6."),
+      });
+      options.push({
+        label: "SELO DE CHUMBO",
+        sub: "Alvo começa todo giro com +1 bala",
+        className: "btn-slate",
+        onClick: () => openReaperTargetModal(data, "selo", "SELO DE CHUMBO", "Escolha quem receberá o Selo até o fim da partida."),
+      });
+    } else if (data.prepStage === 3 && data.targetId === rl.clientId) {
+      options.push({
+        label: "BONECO VUDÚ",
+        sub: "Outro jogador gira junto com você (mín. 4/6)",
+        className: "btn-orange",
+        onClick: () => openReaperTargetModal(data, "boneco", "BONECO VUDÚ", "Escolha quem vai girar junto com você, com no mínimo 4/6."),
+      });
+    }
+
+    openAbilityModal(
+      "SANGUE POR SANGUE",
+      `Pague 1 vida (você tem ${mePlayer ? mePlayer.lives : "?"}) e escolha o efeito desta etapa.`,
+      options
+    );
+  }
+
+  function openReaperTargetModal(data, mode, title, text) {
+    const options = aliveOpponents(data).map((p) => ({
+      label: `${p.nick}`,
+      sub: `${SKIN_LABELS[p.skin] || p.skin} • ${p.lives} vida(s)`,
+      className: "btn-slate",
+      onClick: () => performAbility({ kind: "sangue", mode, targetId: p.id }),
+    }));
+    if (!options.length) {
+      showToast("Nenhum alvo disponível.");
+      return;
+    }
+    openAbilityModal(title, text, options);
+  }
+
+  function handleAbilityButton() {
+    const data = rl.lastState;
+    const me = data && data.me;
+    if (!data || !me) return;
+    if (abilityReason(me, data.phase, data) !== "") return;
+
+    if (me.skin === "outlaw") openBillyModal(data);
+    else if (me.skin === "duchess") openViperModal();
+    else if (me.skin === "cyber") openZeroModal(data);
+    else if (me.skin === "phantom") openReaperModal(data);
+  }
+
+  function renderWinnerPanel(data, champion) {
+    const until = Number(data.winnerScreenUntil || 0);
+    const remainingMs = Math.max(0, Number(data.winnerScreenRemainingMs || 0));
+    const key = champion && until ? `${champion.id}:${until}` : "";
+
+    if (data.phase !== "GAME_OVER" || !champion || !key) {
+      if (rl.winnerScreenTimer) clearTimeout(rl.winnerScreenTimer);
+      rl.winnerScreenTimer = null;
+      rl.winnerScreenKey = "";
+      rl.winnerScreenDeadline = 0;
+      el.winnerPanel.classList.add("hidden");
+      return false;
+    }
+
+    if (rl.winnerScreenKey !== key) {
+      if (rl.winnerScreenTimer) clearTimeout(rl.winnerScreenTimer);
+      rl.winnerScreenKey = key;
+      rl.winnerScreenDeadline = Date.now() + remainingMs;
+      if (remainingMs > 0) {
+        rl.winnerScreenTimer = window.setTimeout(() => {
+          rl.winnerScreenTimer = null;
+          if (rl.lastState) renderArena(rl.lastState, "IDLE");
+        }, remainingMs);
+      }
+    }
+
+    const visible = Date.now() < rl.winnerScreenDeadline;
+    el.winnerPanel.classList.toggle("hidden", !visible);
+    if (!visible) return false;
+
+    const kit = kitFor(data, champion.skin);
+    el.winnerPortrait.src = `assets/portrait_${champion.skin}.png`;
+    el.winnerPortrait.alt = `Retrato de ${champion.nick}`;
+    el.winnerName.textContent = champion.nick;
+    el.winnerRole.textContent = `${SKIN_LABELS[champion.skin] || champion.skin} · ${(kit && kit.role) || ""}`;
+    el.winnerSprite.src = characterGif(champion.skin, "idle");
+    el.winnerSprite.alt = `${champion.nick}, último sobrevivente`;
+    return true;
+  }
+
+  // ------------------------------------------------------------------ arena
   function renderArena(data, animStep) {
     if (!data) return;
+    renderShotOverlay(data, animStep);
+    const champion = data.players.find((p) => p.id === data.championId);
+    const winnerPanelVisible = renderWinnerPanel(data, champion);
+    showWinnerHappy(data, champion);
     const alivePlayers = data.players.filter((p) => p.alive);
     const me = data.players.find((p) => p.id === rl.clientId);
+    const aliveBeforeSpin = alivePlayers.length
+      + (animStep === "SPIN" && data.lastShot && data.lastShot.eliminated ? 1 : 0);
+    const focusDuelSpin = window.innerWidth > 960
+      && data.phase === "ROULETTE_SHOT"
+      && animStep === "SPIN"
+      && aliveBeforeSpin === 2;
+    el.arenaScreen.classList.toggle("duel-spin-focus", focusDuelSpin);
+    const shotStageActive = window.innerWidth > 960
+      && data.phase === "ROULETTE_SHOT"
+      && animStep !== "IDLE";
+    el.arenaScreen.classList.toggle("shot-stage-active", shotStageActive);
 
     el.roundNum.textContent = `${data.roundNum}`;
     el.aliveCount.textContent = `${alivePlayers.length}/${data.players.length}`;
-    el.timer.textContent = data.phase === "PLAYING_CARDS" ? `${data.timeLeft}s` : "-";
+    el.timer.textContent = (data.phase === "PLAYING_CARDS" || data.phase === "PREP")
+      ? `${data.timeLeft}s`
+      : "-";
     el.arenaIp.textContent = `${data.viewerIp}`;
 
     const isMyTurnCards =
@@ -331,12 +1408,14 @@
     el.btnStand.classList.toggle("hidden", data.phase !== "PLAYING_CARDS");
     el.btnHit.disabled = !isMyTurnCards;
     el.btnStand.disabled = !isMyTurnCards;
-    el.btnNext.classList.toggle("hidden", data.phase !== "ROULETTE_SHOT");
-    el.btnRematch.classList.toggle("hidden", data.phase !== "GAME_OVER");
+    const shotCanAdvance = data.phase === "ROULETTE_SHOT" && Date.now() >= rl.shotAnimUntil;
+    el.btnNext.classList.toggle("hidden", !shotCanAdvance);
+    el.btnRematch.classList.toggle("hidden", data.phase !== "GAME_OVER" || winnerPanelVisible);
 
-    // Center Banner + Revolver image
+    // Centro / banner
     if (data.phase === "PLAYING_CARDS") {
       el.revolverImg.src = "assets/revolver_idle.png";
+      el.revolverImg.classList.remove("self-aim");
       el.phaseBanner.className = "status-banner";
       if (isMyTurnCards) {
         el.phaseBanner.textContent = "SUA VEZ NAS CARTAS!";
@@ -347,39 +1426,71 @@
       }
     } else if (data.phase === "CHOOSE_TARGET") {
       el.revolverImg.src = "assets/revolver_spin.gif";
+      el.revolverImg.classList.remove("self-aim");
       const shooter = data.players.find((p) => p.id === data.currentShooterId);
       if (isMyShoot) {
         el.phaseBanner.className = "status-banner bj";
-        el.phaseBanner.textContent = "VOCÊ VENCEU A RODADA! ATIRE!";
-        el.shotDetail.textContent = "Clique no botão 'ATIRAR NESTE!' abaixo do adversário escolhido.";
+        el.phaseBanner.textContent = "VOCÊ VENCEU A RODADA! ESCOLHA O ALVO!";
+        el.shotDetail.textContent = "Escolha um adversário: ele apontará o revólver para si mesmo.";
       } else {
         el.phaseBanner.className = "status-banner";
-        el.phaseBanner.textContent = `${shooter ? shooter.nick : "Vencedor"} VAI ATIRAR!`;
-        el.shotDetail.textContent = "O vencedor da rodada está escolhendo o alvo na mesa...";
+        el.phaseBanner.textContent = `${shooter ? shooter.nick : "Vencedor"} ESCOLHERÁ O ALVO!`;
+        el.shotDetail.textContent = "O vencedor está escolhendo quem deverá atirar em si mesmo...";
       }
+    } else if (data.phase === "PREP") {
+      el.revolverImg.src = "assets/revolver_idle.png";
+      el.revolverImg.classList.remove("self-aim");
+      const target = data.players.find((p) => p.id === data.targetId);
+      const chooser = data.players.find((p) => p.id === data.chooserId);
+      const iAmTarget = me && me.id === data.targetId;
+      el.phaseBanner.className = "status-banner prep";
+      if (iAmTarget) {
+        el.phaseBanner.className = "status-banner prep warn";
+        el.phaseBanner.textContent = `VOCÊ FOI ESCOLHIDO, ${me.nick}!`;
+      } else {
+        el.phaseBanner.textContent = "JANELA DE PREPARAÇÃO";
+      }
+      el.shotDetail.textContent =
+        `${chooser ? chooser.nick : "Vencedor"} escolheu ${target ? target.nick : "o alvo"}. ` +
+        `Habilidades podem ser usadas por ${data.timeLeft}s antes do tambor girar.`;
     } else if (data.phase === "ROULETTE_SHOT" && data.lastShot) {
       const sh = data.lastShot;
+      const sourceLabel = shotSourceLabel(sh);
+      el.revolverImg.src = "assets/revolver_idle.png";
+      el.revolverImg.classList.remove("self-aim");
       if (Date.now() < rl.shotAnimUntil && animStep === "SPIN") {
         el.phaseBanner.className = "status-banner";
-        el.phaseBanner.textContent = `${sh.shooterNick} GIRANDO O TAMBOR...`;
-        el.shotDetail.textContent = `Mirando em ${sh.targetNick} (Chance: ${sh.oddsBefore})`;
+        el.phaseBanner.textContent = sourceLabel
+          ? `${sourceLabel}! ${sh.shooterNick} VAI GIRAR...`
+          : `${sh.shooterNick} APONTANDO PARA SI MESMO...`;
+        el.shotDetail.textContent = sh.curse
+          ? `${sh.chooserNick} lançou a Maldição (mínimo 4/6).`
+          : `${sh.chooserNick} escolheu ${sh.shooterNick} (Chance: ${sh.oddsBefore})`;
+      } else if (sh.guardAbsorbed) {
+        el.phaseBanner.className = "status-banner win";
+        el.phaseBanner.textContent = `GUARDA-COSTAS! ${sh.shooterNick} SOBREVIVEU!`;
+        el.shotDetail.textContent =
+          `O capanga morreu no lugar de ${sh.shooterNick}. Ele ficou com 1 vida e o tambor foi para 3/6.`;
       } else if (sh.fired) {
-        el.revolverImg.src = "assets/revolver_bang.png";
         el.phaseBanner.className = "status-banner lose";
         el.phaseBanner.textContent = sh.eliminated
-          ? `BANG! ${sh.targetNick} ELIMINADO!`
-          : `BANG! ${sh.targetNick} PERDEU 1 VIDA!`;
+          ? `BANG! ${sh.shooterNick} SE ELIMINOU!`
+          : `BANG! ${sh.shooterNick} PERDEU ${sh.damage} VIDA${sh.damage > 1 ? "S" : ""}!`;
         el.shotDetail.textContent = sh.eliminated
-          ? `${sh.shooterNick} disparou (${sh.oddsBefore}) e tirou ${sh.targetNick} do jogo!`
-          : `${sh.shooterNick} acertou (${sh.oddsBefore})! ${sh.targetNick} agora tem ${sh.livesLeft} vidas (tambor voltou a 1/6).`;
+          ? `${sh.chooserNick} escolheu ${sh.shooterNick}; ele atirou em si mesmo (${sh.oddsBefore}) e saiu do jogo!`
+          : `${sh.shooterNick} atirou em si mesmo (${sh.oddsBefore})${sh.damage > 1 ? " com dano 2" : ""}! Restam ${sh.livesLeft} vidas (tambor voltou a 1/6).`;
       } else {
-        el.revolverImg.src = "assets/revolver_click.png";
         el.phaseBanner.className = "status-banner push";
-        el.phaseBanner.textContent = `*CLIQUE*! ${sh.targetNick} SOBREVIVEU!`;
-        el.shotDetail.textContent = `Bala não saiu (${sh.oddsBefore})! Próxima chance em ${sh.targetNick}: ${sh.oddsAfter}!`;
+        el.phaseBanner.textContent = `*CLIQUE*! ${sh.shooterNick} SOBREVIVEU!`;
+        let extra = "";
+        if (sh.pulso === "success") extra = " PULSO FIRME: a bala não subiu.";
+        else if (sh.pulso === "fail") extra = " PULSO FIRME falhou: tambor foi para 2/6.";
+        el.shotDetail.textContent =
+          `A bala não saiu (${sh.oddsBefore}).${extra} Próxima chance de ${sh.shooterNick}: ${sh.oddsAfter}!`;
       }
     } else if (data.phase === "GAME_OVER") {
       el.revolverImg.src = "assets/revolver_idle.png";
+      el.revolverImg.classList.remove("self-aim");
       const champ = data.players.find((p) => p.id === data.championId);
       el.phaseBanner.className = "status-banner win";
       el.phaseBanner.textContent = champ
@@ -388,14 +1499,43 @@
       el.shotDetail.textContent = "Último sobrevivente na mesa! Clique em 'Voltar ao Lobby' para jogar outra.";
     }
 
-    // Render 5 Seats
+    // Janela de preparação
+    renderPrep(data, me);
+
+    if (data.phase === "GAME_OVER" && winnerPanelVisible) {
+      el.phaseBanner.textContent = "PARTIDA ENCERRADA!";
+      el.shotDetail.textContent = "O vencedor está sendo celebrado por 10 segundos.";
+    }
+
+    // Painel de habilidade permanente
+    if (me) renderAbilityPanel(data, data.me || me);
+
+    // Assentos
+    const fx = rl.abilityFx && Date.now() < rl.abilityFx.until ? rl.abilityFx : null;
     el.seatsGrid.innerHTML = "";
     data.players.forEach((p) => {
       const card = document.createElement("div");
       const isMe = p.id === rl.clientId;
       const isShooter = data.phase === "CHOOSE_TARGET" && p.id === data.currentShooterId;
+      const isChosenTarget = data.phase === "PREP" && p.id === data.targetId;
+      const inlineShotStage = window.innerWidth > 960;
+      const isStagedTarget = inlineShotStage
+        && data.phase === "ROULETTE_SHOT"
+        && data.lastShot
+        && data.lastShot.shooterId === p.id
+        && animStep === "SPIN";
+      const isDeathAnimationPending =
+        data.phase === "ROULETTE_SHOT" &&
+        data.lastShot &&
+        data.lastShot.shooterId === p.id &&
+        data.lastShot.fired &&
+        data.lastShot.eliminated &&
+        animStep === "RESULT" &&
+        Date.now() < rl.shotResultAt + SHOT_REACTION_MS;
+      const seatLeavingClass = isStagedTarget ? " shot-leaving" : "";
       const isHitShake =
         data.phase === "ROULETTE_SHOT" &&
+        animStep === "RESULT" &&
         data.lastShot &&
         data.lastShot.fired &&
         data.lastShot.targetId === p.id;
@@ -404,15 +1544,19 @@
         "seat-card" +
         (isMe ? " me" : "") +
         (isShooter ? " shooter" : "") +
-        (!p.alive ? " dead" : "") +
+        (isChosenTarget ? " chosen-target" : "") +
+        (data.phase === "ROULETTE_SHOT" && data.lastShot && data.lastShot.shooterId === p.id && animStep !== "IDLE" ? " self-shooter" : "") +
+        (isStagedTarget ? " shot-away" : "") +
+        (isDeathAnimationPending ? " shot-death-pending" : "") +
+        (!p.alive && !isStagedTarget ? " dead" : "") +
         (isHitShake ? " target-flash" : "");
 
       const heartsHtml = [0, 1, 2]
         .map((i) => `<img src="assets/${i < p.lives ? "heart_full" : "heart_empty"}.png" class="pixel-img" alt="" />`)
         .join("");
 
-      const cylNum = p.alive ? Math.max(1, Math.min(6, p.chambers || 6)) : 1;
-      const dangerClass = p.chambers <= 2 ? " danger" : "";
+      const cylNum = p.alive ? Math.max(1, Math.min(6, p.bullets || 1)) : 1;
+      const dangerClass = p.bullets >= 4 ? " danger" : "";
       const oddsTxt = p.alive ? `Chance ${p.odds}` : "ELIMINADO";
 
       const cardsHtml = (p.hand || [])
@@ -442,14 +1586,89 @@
 
       const spriteSrc = spriteForPlayer(p, data, animStep);
       const canShootThis = isMyShoot && p.alive && !isMe;
+      const isSelfShotTarget =
+        !inlineShotStage &&
+        data.phase === "ROULETTE_SHOT" &&
+        data.lastShot &&
+        data.lastShot.shooterId === p.id &&
+        animStep !== "IDLE";
+      const drumBulletCount = data.lastShot && data.lastShot.shooterId === p.id
+        ? data.lastShot.bulletCountBefore
+        : p.bullets;
+      const chamberIndex = data.lastShot && data.lastShot.shooterId === p.id
+        ? data.lastShot.chamberIndex
+        : 0;
+      const drumRotation = -(Number(chamberIndex || 0) * 60 + 1440);
+      let selfShotGunSrc = "";
+      if (isSelfShotTarget) {
+        selfShotGunSrc = animStep === "SPIN"
+          ? "assets/revolver_spin.gif"
+          : data.lastShot.fired
+            ? "assets/revolver_bang.png"
+            : "assets/revolver_click.png";
+      }
+      const drumHtml = isSelfShotTarget
+        ? `<div class="self-shot-drum-wrap">
+             <span class="self-shot-pointer" aria-hidden="true"></span>
+             <img src="assets/tambor/Tambor-${Math.max(1, Math.min(6, drumBulletCount || 1))}M.png"
+                  class="pixel-img self-shot-drum${animStep === "SPIN" ? " spinning" : ""}"
+                  style="--drum-angle: ${drumRotation}deg"
+                  alt="Tambor com ${drumBulletCount} munição(ões)" />
+           </div>`
+        : "";
+
+      // Chips de estado das habilidades (visíveis para todos)
+      const chips = [];
+      if (p.skin === "boss") {
+        chips.push({ icon: "icon_status_setes", label: `SETES ${p.setes}/2` });
+      }
+      if (p.selo) {
+        chips.push({ icon: "icon_status_selo", label: "SELO" });
+      }
+      if (p.marcado) {
+        chips.push({ icon: "icon_status_marcado", label: "MARCADO" });
+      }
+      if (p.skin === "outlaw") {
+        chips.push({ icon: "icon_marca", label: `MARCA ${p.marks}/3` });
+      } else if (p.skin === "phantom") {
+        chips.push({ icon: "icon_status_sangue", label: `MARCA ${p.marks}/3` });
+      }
+      if (p.skin === "phantom" && p.alive && p.lives === 1) {
+        chips.push({ icon: "icon_status_espectro", label: "ESPECTRO" });
+      }
+      if (p.skin === "boss" && p.guard) {
+        // guard é privado: o servidor só envia para o próprio Don.
+        chips.push({ icon: "icon_status_guarda", label: "GUARDA-COSTAS ARMADO" });
+      }
+      const chipsHtml = chips.length
+        ? `<div class="seat-chips">${chips.map((c) => `
+            <span class="seat-chip${c.label === "GUARDA-COSTAS ARMADO" ? " guard" : ""}">
+              <img src="assets/ui/${c.icon}.png" class="pixel-img" alt="" />${c.label}
+            </span>`).join("")}</div>`
+        : "";
+
+      const fxKey = `${fx ? fx.seq : ""}`;
+      const showFx = fx && (fx.targetId === p.id || (!fx.targetId && fx.actorId === p.id));
+      const fxHtml = showFx
+        ? `<img src="assets/fx/${fx.fx}.gif?t=${fxKey}" class="pixel-img seat-ability-fx" alt="" />`
+        : "";
+      const reticleHtml = (showFx || isChosenTarget)
+        ? `<img src="assets/fx/target_reticle.png" class="pixel-img seat-reticle" alt="" />`
+        : "";
 
       card.innerHTML = `
+        ${fxHtml}
+        ${reticleHtml}
         <div class="seat-top">
           <span class="seat-nick">${escapeHtml(p.nick)}${isMe ? " (EU)" : ""}</span>
           <span class="seat-ip">${escapeHtml(p.ip)}</span>
         </div>
+        <div class="seat-char-name">${SKIN_LABELS[p.skin] || p.skin} · ${escapeHtml((kitFor(data, p.skin) || {}).role || "")}</div>
+        ${chipsHtml}
+        ${drumHtml}
         <div class="seat-sprite-row">
-          <img src="${spriteSrc}" class="pixel-img seat-char-img" alt="${p.skin}" />
+          ${selfShotGunSrc ? `<img src="${selfShotGunSrc}" class="pixel-img self-shot-revolver" alt="Revólver do auto-disparo" />` : ""}
+          <img src="${spriteSrc}" class="pixel-img seat-char-img${seatLeavingClass}" alt="${p.skin}" />
           <div class="seat-stats-col">
             <div class="hearts-row">${heartsHtml}</div>
             <div class="cylinder-badge">
@@ -466,7 +1685,7 @@
         const shootBtn = document.createElement("button");
         shootBtn.type = "button";
         shootBtn.className = "pixel-btn btn-red btn-sm seat-shoot-btn";
-        shootBtn.textContent = `ATIRAR (${p.odds})`;
+        shootBtn.textContent = `ESCOLHER ${p.nick} (${p.odds})`;
         shootBtn.addEventListener("click", () => shootTarget(p.id));
         card.appendChild(shootBtn);
       }
@@ -474,19 +1693,18 @@
       el.seatsGrid.appendChild(card);
     });
 
-    // Logs
-    el.logList.innerHTML = "";
-    (data.logs || []).forEach((line) => {
-      const li = document.createElement("li");
-      li.textContent = "• " + line;
-      el.logList.appendChild(li);
-    });
+    // Feed colorido com símbolo e categoria em cada evento.
+    renderArenaFeed(data.logs || [], data, animStep);
   }
 
   async function shootTarget(targetId) {
     AudioFX.playClick();
     try {
       const data = await apiPost("/api/roulette/shoot", { targetId });
+      // The manual shooter must not wait for the next 900ms polling cycle.
+      // Start immediately from the POST response; duplicate polling states
+      // are ignored by activeShotSeq.
+      startShotAnimationIfNeeded(data);
       applyServerState(data);
     } catch (_) {}
   }
@@ -535,18 +1753,58 @@
       }
     });
 
-    [el.btnLobbyBgm, el.btnArenaBgm].forEach((b) => b.addEventListener("click", toggleBgm));
-    [el.btnLobbySfx, el.btnArenaSfx].forEach((b) => b.addEventListener("click", toggleSfx));
+    [el.btnLobbyBgm, el.btnArenaBgm].forEach((b) => b && b.addEventListener("click", toggleBgm));
+    [el.btnLobbySfx, el.btnArenaSfx].forEach((b) => b && b.addEventListener("click", toggleSfx));
 
     el.skinCards.forEach((card) => {
-      card.addEventListener("click", () => {
+      const select = () => {
         AudioFX.playClick();
+        const owner = skinOwner(card.dataset.skin, (rl.lastState && rl.lastState.players) || []);
+        if (owner) {
+          const characterName = card.querySelector(".char-name")?.textContent || "Esse personagem";
+          showLobbyNotice(`${characterName} já foi escolhido por ${owner.nick}. Escolha outro.`);
+          return;
+        }
+        showLobbyNotice("");
         rl.skin = card.dataset.skin;
-        updateSkinSelectionUI();
+        updateSkinSelectionUI((rl.lastState && rl.lastState.players) || []);
         if (rl.lastState && rl.lastState.players.some((p) => p.id === rl.clientId)) {
           joinOrUpdate();
         }
+      };
+      card.addEventListener("click", select);
+      card.addEventListener("keydown", (e) => {
+        if (e.target.closest("button")) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          select();
+        }
       });
+
+      const detailsBtn = card.querySelector(".char-details-btn");
+      const detailsBox = card.querySelector(".char-details");
+      if (detailsBtn && detailsBox) {
+        detailsBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          AudioFX.playClick();
+          const panel = el.characterDetails;
+          const isOpenForCard = panel
+            && !panel.classList.contains("hidden")
+            && panel.dataset.skin === card.dataset.skin;
+          if (isOpenForCard) {
+            panel.classList.add("hidden");
+            panel.replaceChildren();
+            delete panel.dataset.skin;
+            el.skinCards.forEach((item) => {
+              const button = item.querySelector(".char-details-btn");
+              if (button) button.textContent = "VER DETALHES";
+            });
+          } else {
+            panel.classList.remove("hidden");
+            syncSharedCharacterDetails(card.dataset.skin);
+          }
+        });
+      }
     });
 
     el.btnJoin.addEventListener("click", joinOrUpdate);
@@ -616,7 +1874,50 @@
         applyServerState(await apiPost("/api/roulette/reset", {}));
       } catch (_) {}
     });
+
+    // ---- Habilidades ----
+    el.abilityToggle.addEventListener("click", () => {
+      AudioFX.playClick();
+      rl.panelOpen = !rl.panelOpen;
+      rl.panelUserToggled = true;
+      applyPanelState();
+    });
+
+    el.abilUse.addEventListener("click", handleAbilityButton);
+    el.abilityPanel.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-ability-info]");
+      if (!button) return;
+      event.stopPropagation();
+      AudioFX.playClick();
+      openAbilityInfo(button.dataset.abilityInfo);
+    });
+    el.abilityModalCancel.addEventListener("click", () => {
+      AudioFX.playClick();
+      closeAbilityModal();
+    });
+    el.abilityModal.addEventListener("click", (e) => {
+      if (e.target === el.abilityModal) closeAbilityModal();
+    });
+
+    el.btnReady.addEventListener("click", async () => {
+      AudioFX.playClick();
+      el.btnReady.disabled = true;
+      el.btnReady.textContent = "AGUARDANDO...";
+      try {
+        applyServerState(await apiPost("/api/roulette/confirm", {}));
+      } catch (_) {}
+    });
   }
+
+  // Em telas compactas, o painel inicia recolhido e mantém retrato e nome visíveis.
+  rl.panelOpen = window.innerWidth > 960;
+  applyPanelState();
+  window.addEventListener("resize", () => {
+    if (!rl.panelUserToggled) {
+      rl.panelOpen = window.innerWidth > 960;
+      applyPanelState();
+    }
+  });
 
   bindEvents();
 })(window);

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pixel Blackjack 21 &amp; Roleta Russa</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=unique-character-pick-v1" />
 </head>
 <body>
   <!-- MENU PRINCIPAL -->
@@ -184,7 +184,7 @@
   </main>
 
   <!-- LOBBY ONLINE: ROLETA RUSSA 21 (ATÉ 5 JOGADORES) -->
-  <section id="roulette-lobby" class="table-screen hidden">
+  <section id="roulette-lobby" class="table-screen lobby-screen hidden">
     <header class="hud-bar pixel-panel">
       <div class="hud-group">
         <button id="btn-rl-menu" type="button" class="pixel-btn btn-slate btn-sm">MENU</button>
@@ -212,63 +212,129 @@
       <code>python3 server.py --port 8080</code> (ou configure o Nginx para redirecionar <code>/api/</code>).
     </div>
 
-    <section class="lobby-grid">
-      <!-- Configurar Nick & Skin -->
-      <div class="pixel-panel-gold lobby-card">
-        <h2 class="lobby-heading">1. SEU NICK E PERSONAGEM</h2>
+    <!-- 1. NICK + SELEÇÃO DE PERSONAGEM -->
+    <div class="pixel-panel-gold lobby-chars-panel">
+      <div class="lobby-top-row">
+        <div class="lobby-heading">1. ESCOLHA SEU PERSONAGEM</div>
         <div class="nick-row">
           <label for="rl-nick-input" class="nick-label">SEU NICK:</label>
           <input id="rl-nick-input" type="text" maxlength="16" placeholder="Ex: Caua_PC1" class="pixel-input" />
           <button id="btn-rl-join" type="button" class="pixel-btn btn-green btn-sm">ENTRAR / SALVAR</button>
         </div>
+      </div>
+      <div id="rl-lobby-notice" class="lobby-notice hidden" role="status" aria-live="polite"></div>
 
-        <div class="skins-grid" id="rl-skins-grid">
-          <button type="button" class="skin-card active" data-skin="outlaw">
-            <img src="assets/char_outlaw_idle.gif" alt="Billy" class="pixel-img" />
-            <span class="skin-name">Billy</span>
-            <span class="skin-role">Pistoleiro</span>
-          </button>
-          <button type="button" class="skin-card" data-skin="duchess">
-            <img src="assets/char_duchess_idle.gif" alt="Viper" class="pixel-img" />
-            <span class="skin-name">Viper</span>
-            <span class="skin-role">Duquesa</span>
-          </button>
-          <button type="button" class="skin-card" data-skin="cyber">
-            <img src="assets/char_cyber_idle.gif" alt="Zero" class="pixel-img" />
-            <span class="skin-name">Zero</span>
-            <span class="skin-role">Hacker</span>
-          </button>
-          <button type="button" class="skin-card" data-skin="boss">
-            <img src="assets/char_boss_idle.gif" alt="Don" class="pixel-img" />
-            <span class="skin-name">Don</span>
-            <span class="skin-role">Magnata</span>
-          </button>
-          <button type="button" class="skin-card" data-skin="phantom">
-            <img src="assets/char_phantom_idle.gif" alt="Reaper" class="pixel-img" />
-            <span class="skin-name">Reaper</span>
-            <span class="skin-role">Fantasma</span>
-          </button>
+      <div class="skins-grid" id="rl-skins-grid">
+        <div class="skin-card char-card active" data-skin="outlaw" role="button" tabindex="0" aria-pressed="true">
+          <img src="assets/portrait_outlaw.png" alt="Billy" class="pixel-img char-portrait" />
+          <div class="char-head"><span class="char-name">BILLY</span><span class="char-role">PISTOLEIRO</span></div>
+          <p class="char-tagline">“O melhor atirador do velho oeste, perseguido por um azar que nasceu junto com ele.”</p>
+          <div class="char-skills">
+            <div class="char-skill"><img src="assets/ui/abil_outlaw_passiva.png" alt="" class="pixel-img" /><div><span class="cs-kind">PASSIVA</span><span class="cs-name">MÃO DO DIABO</span><em>Mão inicial 16 → −1 bala</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_outlaw_carga.png" alt="" class="pixel-img" /><div><span class="cs-kind">CARGA</span><span class="cs-name">AZAR DO PISTOLEIRO</span><em>3 estouros seguidos = ficha</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_outlaw_ativa.png" alt="" class="pixel-img" /><div><span class="cs-kind">ATIVA</span><span class="cs-name">MUNIÇÃO TURBINADA</span><em>Marca um alvo: o próximo tiro dele causa 2 de dano</em></div></div>
+          </div>
+          <button type="button" class="pixel-btn btn-slate btn-sm char-details-btn">VER DETALHES</button>
+          <div class="char-details hidden">
+            <p class="char-desc">Caçador de recompensas do velho oeste. Dizem que nunca errou um tiro — nem bêbado, nem cercado por três xerifes ao mesmo tempo. A fama chegou cedo, e com ela veio o azar: sempre que a sorte começa a sorrir, o baralho vira contra ele. Billy já perdeu cavalo, casa e nome numa única noite de jogo. Aprendeu a não apostar em nada além do próprio gatilho. A roleta é só mais uma mesa onde ele chega atrasado e sai devendo.</p>
+            <div class="char-full"><b>MÃO DO DIABO</b><span>Só a mão inicial de exatamente duas cartas que totalize 16 duro ativa: Ás conta como 1 e uma mão macia não vale. Remove 1 bala do tambor, sem descer de 1/6; não gasta ficha.</span></div>
+            <div class="char-full"><b>AZAR DO PISTOLEIRO</b><span>Cada estouro no Blackjack dá 1 marca. Ao completar 3 estouros seguidos, ganha 1 ficha (máximo 1 guardada). A sequência zera ao vencer uma rodada, fazer Blackjack ou usar a ativa.</span></div>
+            <div class="char-full"><b>MUNIÇÃO TURBINADA</b><span>Na janela de preparação, gasta 1 ficha e marca qualquer jogador vivo. No próximo giro dele, um BANG causa 2 de dano em vez de 1 e pode eliminá-lo com 2 vidas; clique também consome a marca. O alvo é avisado, não acumula marcas e perde o efeito se for eliminado antes de girar.</span></div>
+          </div>
+        </div>
+
+        <div class="skin-card char-card" data-skin="duchess" role="button" tabindex="0" aria-pressed="false">
+          <img src="assets/portrait_duchess.png" alt="Viper" class="pixel-img char-portrait" />
+          <div class="char-head"><span class="char-name">VIPER</span><span class="char-role">DUQUESA</span></div>
+          <p class="char-tagline">“A dona do barco-cassino que transforma o próprio risco em caos para a mesa.”</p>
+          <div class="char-skills">
+            <div class="char-skill"><img src="assets/ui/abil_duchess_passiva.png" alt="" class="pixel-img" /><div><span class="cs-kind">PASSIVA</span><span class="cs-name">PULSO FIRME</span><em>75% de não subir a bala no 1/6 (1× por vida)</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_duchess_carga.png" alt="" class="pixel-img" /><div><span class="cs-kind">CARGA</span><span class="cs-name">SANGUE FRIO</span><em>Sobreviver a um giro em 4/6 ou 5/6 = ficha</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_duchess_ativa.png" alt="" class="pixel-img" /><div><span class="cs-kind">ATIVA</span><span class="cs-name">ROLETA DE CABEÇAS</span><em>Sorteia alguém: +1 bala e roleta</em></div></div>
+          </div>
+          <button type="button" class="pixel-btn btn-slate btn-sm char-details-btn">VER DETALHES</button>
+          <div class="char-details hidden">
+          <p class="char-desc">Dona de um barco-cassino que sobe e desce o rio, a Duquesa aprendeu a contar cartas antes de aprender a ler. Foi traída pelo próprio sócio, enterrada numa cova rasa e voltou — dizem que com a ajuda de um veneno que ninguém deveria ter tomado. Hoje ela não joga para ganhar: joga para descobrir até onde os outros aguentam. Quanto mais perto da morte a mesa chega, mais calma ela fica.</p>
+            <div class="char-full"><b>PULSO FIRME</b><span>Uma vez por vida, no primeiro giro que começar exatamente em 1/6, tem 75% de chance de não subir a bala: sucesso mantém 1/6; falha sobe para 2/6. O sorteio e o resultado são públicos. Reseta quando perde uma vida.</span></div>
+            <div class="char-full"><b>SANGUE FRIO</b><span>Uma vez por partida, ganha 1 ficha ao sobreviver de verdade a um giro que começou em 4/6 ou 5/6. Conta a chance antes do disparo; só clique ou BANG não fatal contam.</span></div>
+            <div class="char-full"><b>ROLETA DE CABEÇAS</b><span>Somente quando a Viper for escolhida para girar: na preparação, gasta a ficha e sorteia um jogador vivo, inclusive ela mesma. A Viper gira primeiro; o sorteado recebe +1 bala (máximo 6/6) e gira depois, mesmo que ela morra. A ficha é gasta independentemente do resultado; sem ativação, ela permanece.</span></div>
+          </div>
+        </div>
+
+        <div class="skin-card char-card" data-skin="cyber" role="button" tabindex="0" aria-pressed="false">
+          <img src="assets/portrait_cyber.png" alt="Zero" class="pixel-img char-portrait" />
+          <div class="char-head"><span class="char-name">ZERO</span><span class="char-role">FORASTEIRO</span></div>
+          <p class="char-tagline">“O forasteiro que muda as cartas da mesa sem ninguém ver a mão dele passar.”</p>
+          <div class="char-skills">
+            <div class="char-skill"><img src="assets/ui/abil_cyber_passiva.png" alt="" class="pixel-img" /><div><span class="cs-kind">PASSIVA</span><span class="cs-name">ESPIADA</span><em>Mão inicial 12–16 revela a próxima carta</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_cyber_carga.png" alt="" class="pixel-img" /><div><span class="cs-kind">CARGA</span><span class="cs-name">BARALHO MARCADO</span><em>1 ficha a cada 5 rodadas</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_cyber_ativa.png" alt="" class="pixel-img" /><div><span class="cs-kind">ATIVA</span><span class="cs-name">CURTO-CIRCUITO</span><em>Troca uma carta com um alvo</em></div></div>
+          </div>
+          <button type="button" class="pixel-btn btn-slate btn-sm char-details-btn">VER DETALHES</button>
+          <div class="char-details hidden">
+            <p class="char-desc">Ninguém em Raven Hollow sabe de onde ele veio. Chegou num cavalo sem ferradura, carregando uma caixa de latão cheia de engrenagens que ninguém conseguiu abrir, e pagou o quarto com moedas de um país que não existe. Não tinha nome — chamaram de Zero porque foi isso que ele respondeu quando perguntaram. Dizem que ele conversa com os fios do telégrafo e que sabe qual carta vai sair antes do baralho ser cortado. Onde o Zero senta, o monte muda de ordem.</p>
+            <div class="char-full"><b>ESPIADA</b><span>Se a mão inicial totalizar de 12 a 16, reserva a próxima carta do topo e mostra só ao Zero se ela é SEGURA ou PERIGOSA (Ás nunca estoura). Vale apenas para a primeira compra; desaparece após Hit ou Stand. Fora da faixa, não aparece.</span></div>
+            <div class="char-full"><b>BARALHO MARCADO</b><span>Ganha 1 ficha nas rodadas 5, 10, 15, 20…; o contador é fixo, continua mesmo com ficha cheia e não reinicia. Máximo 1 ficha guardada. É a única ativa que pode ser usada mais de uma vez por partida.</span></div>
+            <div class="char-full"><b>CURTO-CIRCUITO</b><span>Na fase de cartas, escolhe outro jogador vivo com cartas, recebe uma carta aleatória da mão dele e entrega uma carta própria escolhida. Pode usar mesmo depois de estourar, enquanto a rodada estiver aberta. O alvo é avisado; os pontos são recalculados na hora, mas quem já parou ou estourou não recupera o direito de agir.</span></div>
+          </div>
+        </div>
+
+        <div class="skin-card char-card" data-skin="boss" role="button" tabindex="0" aria-pressed="false">
+          <img src="assets/portrait_boss.png" alt="Don" class="pixel-img char-portrait" />
+          <div class="char-head"><span class="char-name">DON</span><span class="char-role">CHEFÃO</span></div>
+          <p class="char-tagline">“O homem que não entra no fogo, porque sempre tem alguém pago para entrar no lugar dele.”</p>
+          <div class="char-skills">
+            <div class="char-skill"><img src="assets/ui/abil_boss_passiva.png" alt="" class="pixel-img" /><div><span class="cs-kind">PASSIVA</span><span class="cs-name">PALAVRA FINAL</span><em>Com um 7 na mão, empate é vitória sua</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_boss_carga.png" alt="" class="pixel-img" /><div><span class="cs-kind">CARGA</span><span class="cs-name">SETE DA SORTE</span><em>7 na mão inicial = marca (2 = ficha)</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_boss_ativa.png" alt="" class="pixel-img" /><div><span class="cs-kind">ATIVA</span><span class="cs-name">GUARDA-COSTAS</span><em>Capanga morre no seu lugar, você fica com 1 vida</em></div></div>
+          </div>
+          <button type="button" class="pixel-btn btn-slate btn-sm char-details-btn">VER DETALHES</button>
+          <div class="char-details hidden">
+            <p class="char-desc">Barão de terras e dono da linha do telégrafo, o Don é a lei de Raven Hollow — o xerife bebe no balcão dele e o juiz dorme na casa dele. Nunca sujou as mãos, porque sempre existe alguém pago para sujar por ele. Tem uma única superstição: um sete na mão é o sinal de que o destino está do lado dele. Quando o sete aparece, o Don não discute o resultado — ele decide quem ganha.</p>
+            <div class="char-full"><b>PALAVRA FINAL</b><span>Enquanto tiver um 7 na mão, qualquer empate que inclua o Don vira vitória só dele; os outros empatados não recebem a vitória. Vale para um 7 inicial ou comprado depois, sem clique nem custo.</span></div>
+            <div class="char-full"><b>SETE DA SORTE</b><span>Um 7 na mão inicial dá 1 marca SETES. Ao chegar a 2 marcas, arma automaticamente o Guarda-Costas e ganha sua ficha. Máximo 1 ficha por partida.</span></div>
+            <div class="char-full"><b>GUARDA-COSTAS</b><span>Arma-se automaticamente e fica secreto, visível só ao Don. No primeiro disparo que causaria dano fatal (dano ≥ vidas), o capanga absorve: Don fica com 1 vida, tambor em 3/6 e ficha consumida. Não age em dano não fatal e só pode salvar uma vez na partida.</span></div>
+          </div>
+        </div>
+
+        <div class="skin-card char-card" data-skin="phantom" role="button" tabindex="0" aria-pressed="false">
+          <img src="assets/portrait_phantom.png" alt="Reaper" class="pixel-img char-portrait" />
+          <div class="char-head"><span class="char-name">REAPER</span><span class="char-role">MORTO-VIVO</span></div>
+          <p class="char-tagline">“O meio-morto que fica mais perigoso a cada passo rumo ao próprio fim.”</p>
+          <div class="char-skills">
+            <div class="char-skill"><img src="assets/ui/abil_phantom_passiva.png" alt="" class="pixel-img" /><div><span class="cs-kind">PASSIVA</span><span class="cs-name">ESPECTRO</span><em>Com 1 vida, o tambor nunca passa de 2/6</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_phantom_carga.png" alt="" class="pixel-img" /><div><span class="cs-kind">CARGA</span><span class="cs-name">SEDE DE SANGUE</span><em>3 BANGs = ficha</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_phantom_ativa.png" alt="" class="pixel-img" /><div><span class="cs-kind">ATIVA</span><span class="cs-name">SANGUE POR SANGUE</span><em>Paga 1 vida: Maldição, Selo de Chumbo ou Boneco Vudú</em></div></div>
+          </div>
+          <button type="button" class="pixel-btn btn-slate btn-sm char-details-btn">VER DETALHES</button>
+          <div class="char-details hidden">
+            <p class="char-desc">O coveiro de Raven Hollow já abriu a cova dele três vezes, e três vezes a cova amanheceu vazia. Ninguém sabe se ele está vivo. Metade dele já foi embora — o resto se recusa a ir. Quanto mais perto da terra ele chega, mais forte fica, como se a morte não soubesse o que fazer com ele. Os outros jogadores aprenderam que a única hora segura para enfrentá-lo é quando ele ainda está inteiro.</p>
+            <div class="char-full"><b>ESPECTRO</b><span>Com exatamente 1 vida, o tambor final do Reaper nunca passa de 2/6, mesmo após Selo, mínimo 4/6 ou +1 bala. O tiro acontece normalmente; não é escudo.</span></div>
+            <div class="char-full"><b>SEDE DE SANGUE</b><span>Cada BANG em qualquer jogador dá 1 marca, inclusive tiro absorvido pelo Guarda-Costas e tiro no próprio Reaper. Com 3 marcas ganha 1 ficha; guarda no máximo 1. A vida limita o uso a duas vezes na partida.</span></div>
+            <div class="char-full"><b>SANGUE POR SANGUE</b><span>Somente na preparação, paga 1 vida (precisa ter 2+) e gasta a ficha para escolher um modo e outro jogador vivo. Maldição: gira imediatamente com mínimo 4/6 e depois volta a 1/6 (se o Guarda-Costas absorver, fica em 3/6). Selo: alvo começa cada giro com +1 bala até o fim da partida, máximo 6/6. Boneco: só quando o Reaper foi escolhido para girar; ele gira normalmente primeiro e escolhe outro jogador, que gira depois com mínimo 4/6 — mesmo se o Reaper morrer.</span></div>
+          </div>
         </div>
       </div>
+      <div id="rl-character-details" class="char-details shared-char-details hidden" aria-live="polite"></div>
+    </div>
 
-      <!-- Lista de Jogadores na Rede -->
-      <div class="pixel-panel lobby-card">
-        <h2 class="lobby-heading">2. JOGADORES CONECTADOS NA REDE (MÁX. 5)</h2>
-        <div id="rl-lobby-players" class="lobby-roster"></div>
+    <!-- 2. LISTA DE JOGADORES -->
+    <div class="pixel-panel lobby-roster-panel">
+      <h2 class="lobby-heading">2. JOGADORES CONECTADOS NA REDE (MÁX. 5)</h2>
+      <div id="rl-lobby-players" class="lobby-roster"></div>
 
-        <div class="actions-row" style="margin-top: 8px;">
-          <button id="btn-rl-add-bot" type="button" class="pixel-btn btn-slate btn-sm">+ BOT (TESTE)</button>
-          <button id="btn-rl-clear-bots" type="button" class="pixel-btn btn-orange btn-sm">LIMPAR BOTS</button>
-          <button id="btn-rl-leave" type="button" class="pixel-btn btn-red btn-sm">SAIR DA MESA</button>
-          <button id="btn-rl-start" type="button" class="pixel-btn btn-gold">INICIAR PARTIDA</button>
-        </div>
-
-        <div class="network-devices-box">
-          <div class="network-devices-title">MÁQUINAS RECONHECIDAS NA REDE:</div>
-          <div id="rl-network-devices" class="network-devices-list"></div>
-        </div>
+      <div class="actions-row" style="margin-top: 8px;">
+        <button id="btn-rl-add-bot" type="button" class="pixel-btn btn-slate btn-sm">+ BOT (TESTE)</button>
+        <button id="btn-rl-clear-bots" type="button" class="pixel-btn btn-orange btn-sm">LIMPAR BOTS</button>
+        <button id="btn-rl-leave" type="button" class="pixel-btn btn-red btn-sm">SAIR DA MESA</button>
+        <button id="btn-rl-start" type="button" class="pixel-btn btn-gold">INICIAR PARTIDA</button>
       </div>
-    </section>
+
+      <div class="network-devices-box">
+        <div class="network-devices-title">MÁQUINAS RECONHECIDAS NA REDE:</div>
+        <div id="rl-network-devices" class="network-devices-list"></div>
+      </div>
+    </div>
   </section>
 
   <!-- ARENA ONLINE: ROLETA RUSSA 21 -->
@@ -321,18 +387,140 @@
             <button id="btn-rl-next" type="button" class="pixel-btn btn-gold hidden">PRÓXIMA RODADA</button>
             <button id="btn-rl-rematch" type="button" class="pixel-btn btn-gold hidden">VOLTAR AO LOBBY</button>
           </div>
+
+          <div id="rl-prep-box" class="prep-box hidden">
+            <div class="prep-head">
+              <span class="prep-title">JANELA DE PREPARAÇÃO</span>
+              <span id="rl-prep-timer" class="prep-timer">8s</span>
+            </div>
+            <div id="rl-prep-hint" class="prep-hint">Use sua habilidade antes do tambor girar.</div>
+            <div class="prep-footer">
+              <div id="rl-prep-ready-list" class="prep-ready-list"></div>
+              <button id="btn-rl-ready" type="button" class="pixel-btn btn-gold btn-sm">PRONTO</button>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- 5 Assentos dos Jogadores -->
       <div id="rl-seats-grid" class="seats-grid"></div>
 
+      <section id="rl-winner-panel" class="winner-panel hidden" aria-live="polite" aria-label="Resultado da partida">
+        <div class="winner-panel-card pixel-panel-gold">
+          <div class="winner-kicker">ÚLTIMO SOBREVIVENTE</div>
+          <div class="winner-content">
+            <img id="rl-winner-portrait" class="pixel-img winner-portrait" alt="Retrato do vencedor" />
+            <div class="winner-copy">
+              <div id="rl-winner-name" class="winner-name"></div>
+              <div class="winner-message">CONSEGUIU SOBREVIVER! PARABÉNS!</div>
+              <div id="rl-winner-role" class="winner-role"></div>
+            </div>
+            <img id="rl-winner-sprite" class="pixel-img winner-sprite" alt="Personagem vencedor na mesa" />
+          </div>
+        </div>
+      </section>
+
       <!-- Registro de Eventos da Rede -->
-      <div class="arena-log pixel-panel">
-        <div class="arena-log-title">REGISTRO DA MESA (TEMPO REAL)</div>
+      <div class="arena-log pixel-panel" role="region" aria-label="Feed de eventos da mesa">
+        <div class="arena-log-heading">
+          <div class="arena-log-title">FEED DA MESA</div>
+          <span class="arena-log-live">AO VIVO</span>
+        </div>
         <ul id="rl-log-list" class="arena-log-list"></ul>
       </div>
     </section>
+
+    <!-- PAINEL PERMANENTE DE HABILIDADE -->
+    <aside id="rl-ability-panel" class="ability-panel pixel-panel">
+      <button id="rl-ability-toggle" type="button" class="ability-toggle" aria-expanded="true">
+        <img id="rl-ability-portrait" src="assets/portrait_outlaw.png" class="pixel-img ability-portrait" alt="Billy" />
+        <span class="ability-toggle-main">
+          <span id="rl-ability-toggle-name">BILLY — Pistoleiro</span>
+          <span id="rl-ability-toggle-passive" class="ability-toggle-passive">MÃO DO DIABO</span>
+        </span>
+        <span id="rl-ability-toggle-arrow" class="ability-toggle-arrow">▾</span>
+      </button>
+      <div id="rl-ability-body" class="ability-body">
+        <div class="ability-row passive">
+          <div class="ability-row-head">
+            <img id="rl-abil-passive-icon" src="assets/ui/abil_outlaw_passiva.png" class="pixel-img" alt="" />
+            <span class="ability-kind">PASSIVA</span>
+            <strong id="rl-abil-passive-name">MÃO DO DIABO</strong>
+            <button type="button" class="ability-info-btn" data-ability-info="passive" aria-label="Detalhes da passiva">?</button>
+          </div>
+          <div id="rl-abil-passive-desc" class="ability-row-desc">Mão inicial 16 → −1 bala</div>
+        </div>
+
+        <div class="ability-row charge">
+          <div class="ability-row-head">
+            <img id="rl-abil-charge-icon" src="assets/ui/abil_outlaw_carga.png" class="pixel-img" alt="" />
+            <span class="ability-kind">CARGA</span>
+            <strong id="rl-abil-charge-name">AZAR DO PISTOLEIRO</strong>
+            <button type="button" class="ability-info-btn" data-ability-info="charge" aria-label="Detalhes da carga">?</button>
+          </div>
+          <div id="rl-abil-charge-desc" class="ability-row-desc">3 estouros seguidos = ficha</div>
+          <div id="rl-abil-marks-wrap" class="ability-marks">
+            <img src="assets/ui/icon_marca.png" class="pixel-img" alt="" />
+            <span id="rl-abil-marks-text">0/3</span>
+            <div class="ability-bar"><i id="rl-abil-bar-fill" style="width: 0%"></i></div>
+          </div>
+        </div>
+
+        <div class="ability-row active">
+          <div class="ability-row-head">
+            <img id="rl-abil-active-icon" src="assets/ui/abil_outlaw_ativa.png" class="pixel-img" alt="" />
+            <span class="ability-kind">ATIVA</span>
+            <strong id="rl-abil-active-name">MUNIÇÃO TURBINADA</strong>
+            <button type="button" class="ability-info-btn" data-ability-info="active" aria-label="Detalhes da ativa">?</button>
+          </div>
+          <div id="rl-abil-active-desc" class="ability-row-desc">Marca um alvo: o próximo tiro dele causa 2 de dano</div>
+          <div class="ability-active-footer">
+            <img src="assets/ui/icon_ficha.png" class="pixel-img" alt="" />
+            <span id="rl-abil-ficha-text">Sem ficha</span>
+            <button id="rl-abil-use" type="button" class="pixel-btn btn-gold btn-sm" disabled>USAR</button>
+          </div>
+        </div>
+
+        <div id="rl-abil-effect" class="ability-effect hidden"></div>
+
+        <div id="rl-espiada" class="ability-espiada hidden">
+          <img id="rl-espiada-icon" src="assets/ui/fx_espiada_segura.png" class="pixel-img" alt="" />
+          <span id="rl-espiada-text">ESPIADA: SEGURA</span>
+        </div>
+      </div>
+    </aside>
+
+    <div id="rl-ability-modal" class="modal-backdrop hidden">
+      <div class="modal-box pixel-panel-gold ability-modal-box">
+        <div id="rl-ability-modal-title" class="modal-title">MUNIÇÃO TURBINADA</div>
+        <div id="rl-ability-modal-text" class="ability-modal-text"></div>
+        <div id="rl-ability-modal-options" class="ability-modal-options"></div>
+        <div class="actions-row">
+          <button id="rl-ability-modal-cancel" type="button" class="pixel-btn btn-slate">CANCELAR</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="rl-shot-overlay" class="shot-overlay hidden" aria-live="assertive">
+      <div class="shot-overlay-backdrop"></div>
+      <div class="shot-overlay-panel pixel-panel-gold">
+        <div id="rl-shot-overlay-title" class="shot-overlay-title">PREPARE-SE...</div>
+        <div id="rl-shot-overlay-detail" class="shot-overlay-detail"></div>
+        <div class="shot-overlay-scene">
+          <img id="rl-shot-overlay-fx" class="pixel-img shot-overlay-fx hidden" alt="" />
+          <div class="shot-overlay-drum-wrap">
+            <span class="shot-overlay-pointer" aria-hidden="true"></span>
+            <img id="rl-shot-overlay-drum" class="pixel-img shot-overlay-drum" alt="Tambor da roleta" />
+          </div>
+          <div class="shot-overlay-target-row">
+            <img id="rl-shot-overlay-gun" class="pixel-img shot-overlay-gun" alt="Revólver" />
+            <img id="rl-shot-overlay-character" class="pixel-img shot-overlay-character" alt="Jogador escolhido" />
+          </div>
+          <div id="rl-shot-overlay-name" class="shot-overlay-name"></div>
+        </div>
+      </div>
+    </div>
+    <div id="rl-shot-flash" class="shot-flash hidden" aria-hidden="true"></div>
   </main>
 
   <!-- MODAL DE REGRAS (BLACKJACK SOLO) -->
@@ -368,8 +556,8 @@
         <li><strong>Até 5 Jogadores na Rede:</strong> Cada máquina entra com seu <strong>Nick</strong> e escolhe uma das 5 skins exclusivas. O servidor reconhece o IP e sistema de cada participante.</li>
         <li><strong>3 Vidas por Jogador:</strong> Todos começam com <strong>3 corações</strong> e um tambor próprio de 6 câmaras com 1 bala (chance inicial <strong>1/6</strong>).</li>
         <li><strong>Rodada de Blackjack:</strong> Todos os vivos jogam suas cartas tentando chegar o mais perto de <strong>21</strong> sem estourar.</li>
-        <li><strong>Hora do Disparo:</strong> Quem fizer a melhor mão da rodada escolhe <strong>qual adversário vai encarar o revólver</strong>!</li>
-        <li><strong>Probabilidade Crescente (1/6 → 1/5 → 1/4...):</strong> Se o tiro falhar (<em>*CLIQUE*</em>), o alvo sobrevive, mas a chance do seu próprio tambor sobe para <strong>1/5</strong>, depois <strong>1/4</strong>, <strong>1/3</strong>, <strong>1/2</strong> até <strong>1/1</strong>! Quando a bala dispara, o alvo perde 1 vida e o tambor volta para <strong>1/6</strong> (se ainda tiver vidas).</li>
+         <li><strong>Hora do Disparo:</strong> Quem fizer a melhor mão da rodada escolhe um adversário. O jogador escolhido aponta o revólver para <strong>si mesmo</strong>!</li>
+         <li><strong>Probabilidade Crescente (1/6 → 2/6 → 3/6...):</strong> Se o tiro falhar (<em>*CLIQUE*</em>), uma nova munição entra no tambor. A chance passa para <strong>2/6</strong>, depois <strong>3/6</strong>, até <strong>6/6</strong>! Quando a bala dispara, o jogador perde 1 vida e o tambor volta para <strong>1/6</strong> (se ainda tiver vidas).</li>
         <li><strong>Vitória:</strong> O último sobrevivente vence a partida!</li>
       </ul>
 
@@ -377,8 +565,8 @@
     </div>
   </div>
 
-  <script src="audio.js"></script>
-  <script src="game.js"></script>
-  <script src="online.js"></script>
+  <script src="audio.js?v=bgm-wav-v2"></script>
+  <script src="game.js?v=bgm-wav-v1"></script>
+  <script src="online.js?v=unique-character-pick-v1"></script>
 </body>
 </html>

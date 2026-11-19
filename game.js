@@ -931,6 +931,14 @@
     el.btnNewBet.addEventListener("click", prepareNewBet);
   }
 
+  global.addEventListener("retro-bgm-change", (event) => {
+    const enabled = !!(event.detail && event.detail.enabled);
+    if (state.bgmOn === enabled) return;
+    state.bgmOn = enabled;
+    updateAudioButtons();
+    persistSave();
+  });
+
   function init() {
     const save = loadSave();
     if (save) {

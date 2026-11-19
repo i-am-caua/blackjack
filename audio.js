@@ -1,6 +1,5 @@
 /**
- * Retro 8-bit Web Audio Synthesizer for Pixel Blackjack 21
- * Zero external audio files required — runs 100% offline.
+ * Asset-backed background music and synthesized retro sound effects.
  */
 (function (global) {
   "use strict";
@@ -9,27 +8,37 @@
     constructor() {
       this.ctx = null;
       this.master = null;
-      this.bgmGain = null;
       this.sfxGain = null;
       this.bgmEnabled = true;
       this.sfxEnabled = true;
       this.isPlayingBgm = false;
-      this._bgmTimer = null;
-      this._step = 0;
-
-      // Playful 8-bit casino ragtime loop (32 16th/8th steps in C major / A minor)
-      this._melody = [
-        523.25, 0, 659.25, 783.99, 880.0, 0, 783.99, 659.25,
-        587.33, 659.25, 698.46, 0, 659.25, 587.33, 523.25, 0,
-        440.0, 0, 523.25, 659.25, 783.99, 659.25, 587.33, 0,
-        523.25, 587.33, 659.25, 783.99, 1046.5, 0, 783.99, 0,
-      ];
-      this._bass = [
-        130.81, 0, 196.0, 0, 146.83, 0, 196.0, 0,
-        174.61, 0, 196.0, 0, 130.81, 0, 196.0, 0,
-        110.0, 0, 164.81, 0, 146.83, 0, 196.0, 0,
-        130.81, 0, 196.0, 0, 130.81, 146.83, 164.81, 196.0,
-      ];
+      this.bgmVolume = 0.2;
+      this._bgmPlaySeq = 0;
+      this.musicAudio = typeof global.Audio === "function"
+        ? new global.Audio("assets/8bit-musicaJogoOFC.wav")
+        : null;
+      if (this.musicAudio) {
+        this.musicAudio.preload = "auto";
+        this.musicAudio.loop = true;
+        this.musicAudio.volume = this.bgmVolume;
+      }
+      this._startBgmAfterGesture = () => {
+        global.removeEventListener("pointerdown", this._startBgmAfterGesture);
+        global.removeEventListener("keydown", this._startBgmAfterGesture);
+        if (this.bgmEnabled) {
+          this.isPlayingBgm = false;
+          this.startBgm();
+        }
+      };
+      global.addEventListener("pointerdown", this._startBgmAfterGesture, { once: true, passive: true });
+      global.addEventListener("keydown", this._startBgmAfterGesture, { once: true });
+      this.gunshotAudio = typeof global.Audio === "function"
+        ? new global.Audio("assets/SomTiro.mp3")
+        : null;
+      if (this.gunshotAudio) {
+        this.gunshotAudio.preload = "auto";
+        this.gunshotAudio.volume = 0.5;
+      }
     }
 
     ensureContext() {
@@ -40,10 +49,6 @@
         this.master = this.ctx.createGain();
         this.master.gain.value = 0.65;
         this.master.connect(this.ctx.destination);
-
-        this.bgmGain = this.ctx.createGain();
-        this.bgmGain.gain.value = this.bgmEnabled ? 0.16 : 0;
-        this.bgmGain.connect(this.master);
 
         this.sfxGain = this.ctx.createGain();
         this.sfxGain.gain.value = this.sfxEnabled ? 0.45 : 0;
@@ -56,21 +61,25 @@
     }
 
     setBgmEnabled(enabled) {
-      this.bgmEnabled = !!enabled;
-      if (this.bgmGain && this.ctx) {
-        this.bgmGain.gain.setTargetAtTime(this.bgmEnabled ? 0.16 : 0, this.ctx.currentTime, 0.03);
+      const nextEnabled = !!enabled;
+      const changed = this.bgmEnabled !== nextEnabled;
+      this.bgmEnabled = nextEnabled;
+      if (changed && typeof global.CustomEvent === "function") {
+        global.dispatchEvent(new global.CustomEvent("retro-bgm-change", {
+          detail: { enabled: this.bgmEnabled },
+        }));
       }
-      if (this.bgmEnabled && !this.isPlayingBgm && this.ctx) {
-        this.startBgm();
-      } else if (!this.bgmEnabled && this.isPlayingBgm) {
-        this.stopBgm();
-      }
+      if (this.bgmEnabled) this.startBgm();
+      else this.stopBgm();
     }
 
     setSfxEnabled(enabled) {
       this.sfxEnabled = !!enabled;
       if (this.sfxGain && this.ctx) {
         this.sfxGain.gain.setTargetAtTime(this.sfxEnabled ? 0.45 : 0, this.ctx.currentTime, 0.02);
+      }
+      if (this.gunshotAudio) {
+        this.gunshotAudio.volume = this.sfxEnabled ? 0.5 : 0;
       }
     }
 
@@ -119,40 +128,28 @@
     }
 
     startBgm() {
-      if (!this.bgmEnabled || this.isPlayingBgm) return;
-      if (!this.ensureContext()) return;
-      this.isPlayingBgm = true;
-      const stepMs = 175;
+      if (!this.bgmEnabled || !this.musicAudio) return;
+      if (this.isPlayingBgm && !this.musicAudio.paused) return;
 
-      const tick = () => {
-        if (!this.isPlayingBgm || !this.bgmEnabled) return;
-        const now = this.ctx.currentTime + 0.02;
-        const idx = this._step % this._melody.length;
-        const mFreq = this._melody[idx];
-        const bFreq = this._bass[idx];
-
-        if (mFreq > 0) {
-          this._tone(mFreq, now, 0.13, "square", 0.22, this.bgmGain);
+      const playSeq = ++this._bgmPlaySeq;
+      this.musicAudio.volume = this.bgmVolume;
+      try {
+        const playback = this.musicAudio.play();
+        this.isPlayingBgm = true;
+        if (playback && typeof playback.catch === "function") {
+          playback.catch(() => {
+            if (playSeq === this._bgmPlaySeq) this.isPlayingBgm = false;
+          });
         }
-        if (bFreq > 0) {
-          this._tone(bFreq, now, 0.16, "triangle", 0.42, this.bgmGain);
-        }
-        if (idx % 2 === 1) {
-          this._noise(now, 0.04, 0.1, 5500, this.bgmGain);
-        }
-        this._step = (this._step + 1) % this._melody.length;
-      };
-
-      tick();
-      this._bgmTimer = global.setInterval(tick, stepMs);
+      } catch (_) {
+        this.isPlayingBgm = false;
+      }
     }
 
     stopBgm() {
+      this._bgmPlaySeq += 1;
       this.isPlayingBgm = false;
-      if (this._bgmTimer) {
-        global.clearInterval(this._bgmTimer);
-        this._bgmTimer = null;
-      }
+      if (this.musicAudio) this.musicAudio.pause();
     }
 
     playClick() {
@@ -237,6 +234,22 @@
     }
 
     playGunshot() {
+      if (!this.sfxEnabled) return;
+      if (this.gunshotAudio) {
+        this.gunshotAudio.volume = 0.5;
+        try {
+          this.gunshotAudio.currentTime = 0;
+        } catch (_) {}
+        const playback = this.gunshotAudio.play();
+        if (playback && typeof playback.catch === "function") {
+          playback.catch(() => this._playSynthGunshot());
+        }
+        return;
+      }
+      this._playSynthGunshot();
+    }
+
+    _playSynthGunshot() {
       if (!this.sfxEnabled || !this.ensureContext()) return;
       const t = this.ctx.currentTime;
       this._noise(t, 0.32, 0.85, 220, this.sfxGain);
