@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pixel Blackjack 21 &amp; Roleta Russa</title>
-  <link rel="stylesheet" href="style.css?v=unique-character-pick-v1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <link rel="stylesheet" href="style.css?v=lapide-bots-v1" />
 </head>
 <body>
   <!-- MENU PRINCIPAL -->
@@ -304,14 +305,29 @@
           <div class="char-skills">
             <div class="char-skill"><img src="assets/ui/abil_phantom_passiva.png" alt="" class="pixel-img" /><div><span class="cs-kind">PASSIVA</span><span class="cs-name">ESPECTRO</span><em>Com 1 vida, o tambor nunca passa de 2/6</em></div></div>
             <div class="char-skill"><img src="assets/ui/abil_phantom_carga.png" alt="" class="pixel-img" /><div><span class="cs-kind">CARGA</span><span class="cs-name">SEDE DE SANGUE</span><em>3 BANGs = ficha</em></div></div>
-            <div class="char-skill"><img src="assets/ui/abil_phantom_ativa.png" alt="" class="pixel-img" /><div><span class="cs-kind">ATIVA</span><span class="cs-name">SANGUE POR SANGUE</span><em>Paga 1 vida: Maldição, Selo de Chumbo ou Boneco Vudú</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_phantom_ativa.png" alt="" class="pixel-img" /><div><span class="cs-kind">ATIVA</span><span class="cs-name">SANGUE POR SANGUE</span><em>Paga 1 vida + 1 ficha: Maldição, Selo ou Boneco Vudú</em></div></div>
           </div>
           <button type="button" class="pixel-btn btn-slate btn-sm char-details-btn">VER DETALHES</button>
           <div class="char-details hidden">
             <p class="char-desc">O coveiro de Raven Hollow já abriu a cova dele três vezes, e três vezes a cova amanheceu vazia. Ninguém sabe se ele está vivo. Metade dele já foi embora — o resto se recusa a ir. Quanto mais perto da terra ele chega, mais forte fica, como se a morte não soubesse o que fazer com ele. Os outros jogadores aprenderam que a única hora segura para enfrentá-lo é quando ele ainda está inteiro.</p>
             <div class="char-full"><b>ESPECTRO</b><span>Com exatamente 1 vida, o tambor final do Reaper nunca passa de 2/6, mesmo após Selo, mínimo 4/6 ou +1 bala. O tiro acontece normalmente; não é escudo.</span></div>
             <div class="char-full"><b>SEDE DE SANGUE</b><span>Cada BANG em qualquer jogador dá 1 marca, inclusive tiro absorvido pelo Guarda-Costas e tiro no próprio Reaper. Com 3 marcas ganha 1 ficha; guarda no máximo 1. A vida limita o uso a duas vezes na partida.</span></div>
-            <div class="char-full"><b>SANGUE POR SANGUE</b><span>Somente na preparação, paga 1 vida (precisa ter 2+) e gasta a ficha para escolher um modo e outro jogador vivo. Maldição: gira imediatamente com mínimo 4/6 e depois volta a 1/6 (se o Guarda-Costas absorver, fica em 3/6). Selo: alvo começa cada giro com +1 bala até o fim da partida, máximo 6/6. Boneco: só quando o Reaper foi escolhido para girar; ele gira normalmente primeiro e escolhe outro jogador, que gira depois com mínimo 4/6 — mesmo se o Reaper morrer.</span></div>
+            <div class="char-full mode-general">
+              <b>SANGUE POR SANGUE · REGRAS GERAIS</b>
+              <span>Use somente na janela de preparação. Cada modo custa 1 ficha e 1 vida; o Reaper precisa ter pelo menos 2 vidas antes de ativar. Maldição e Selo ficam disponíveis na primeira etapa do Reaper. Boneco Vudú só fica disponível quando ele foi escolhido para girar.</span>
+            </div>
+            <div class="char-full mode-card mode-curse">
+              <b>MODO 1 · MALDIÇÃO</b>
+              <span>Escolha outro jogador vivo: ele gira imediatamente com no mínimo 4/6. Depois do giro, o tambor volta a 1/6; se o Guarda-Costas absorver o tiro fatal, fica em 3/6.</span>
+            </div>
+            <div class="char-full mode-card mode-seal">
+              <b>MODO 2 · SELO DE CHUMBO</b>
+              <span>Escolha outro jogador vivo. Até o fim da partida, cada giro dele começa com +1 bala, sem passar de 6/6.</span>
+            </div>
+            <div class="char-full mode-card mode-boneco">
+              <b>MODO 3 · BONECO VUDÚ</b>
+              <span>Quando o Reaper for escolhido para girar, amaldiçoe outro jogador vivo por cinco rodadas, contando a atual. A ativação não acrescenta munição. Se um disparo atingir o Reaper durante o prazo, todo o dano é transferido e o efeito termina; os 2 danos da Munição Turbinada também são transferidos e podem eliminar um alvo com 2 vidas. O Guarda-Costas do Don pode absorver dano fatal transferido. Sem transferência até o fim da quinta rodada, a maldição acaba antes de o Reaper girar com no mínimo 5/6. Esse giro não transfere dano; com 1 vida, o Espectro limita a chance efetiva a 2/6.</span>
+            </div>
           </div>
         </div>
       </div>
@@ -324,7 +340,7 @@
       <div id="rl-lobby-players" class="lobby-roster"></div>
 
       <div class="actions-row" style="margin-top: 8px;">
-        <button id="btn-rl-add-bot" type="button" class="pixel-btn btn-slate btn-sm">+ BOT (TESTE)</button>
+        <button id="btn-rl-add-bot" type="button" class="pixel-btn btn-slate btn-sm">+ ADICIONAR BOT</button>
         <button id="btn-rl-clear-bots" type="button" class="pixel-btn btn-orange btn-sm">LIMPAR BOTS</button>
         <button id="btn-rl-leave" type="button" class="pixel-btn btn-red btn-sm">SAIR DA MESA</button>
         <button id="btn-rl-start" type="button" class="pixel-btn btn-gold">INICIAR PARTIDA</button>
@@ -523,6 +539,20 @@
     <div id="rl-shot-flash" class="shot-flash hidden" aria-hidden="true"></div>
   </main>
 
+  <!-- MODAL DE ADICIONAR BOT (funciona no lobby, antes ou depois de entrar) -->
+  <div id="rl-bot-modal" class="modal-backdrop hidden">
+    <div class="modal-box pixel-panel-gold bot-modal-box">
+      <div class="modal-title">ADICIONAR BOT</div>
+      <div class="ability-modal-text">
+        Escolha qual personagem o bot vai usar. Cada personagem só pode estar uma vez na mesa.
+      </div>
+      <div id="rl-bot-modal-options" class="ability-modal-options bot-modal-options"></div>
+      <div class="actions-row">
+        <button id="rl-bot-modal-cancel" type="button" class="pixel-btn btn-slate">CANCELAR</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL DE REGRAS (BLACKJACK SOLO) -->
   <div id="rules-modal" class="modal-backdrop hidden">
     <div class="modal-box pixel-panel-gold">
@@ -555,6 +585,7 @@
       <ul class="rules-list">
         <li><strong>Até 5 Jogadores na Rede:</strong> Cada máquina entra com seu <strong>Nick</strong> e escolhe uma das 5 skins exclusivas. O servidor reconhece o IP e sistema de cada participante.</li>
         <li><strong>3 Vidas por Jogador:</strong> Todos começam com <strong>3 corações</strong> e um tambor próprio de 6 câmaras com 1 bala (chance inicial <strong>1/6</strong>).</li>
+        <li><strong>Valor das Cartas:</strong> Cartas de <strong>2 a 10</strong> valem o número; <strong>J, Q e K</strong> valem <strong>10</strong>; o <strong>Ás</strong> vale <strong>1 ou 11</strong> — sempre o valor que mais ajuda a mão sem estourar. Ex.: <strong>7 + Ás + 6 = 14</strong> (com Ás valendo 11 daria 24, então ele cai para 1).</li>
         <li><strong>Rodada de Blackjack:</strong> Todos os vivos jogam suas cartas tentando chegar o mais perto de <strong>21</strong> sem estourar.</li>
          <li><strong>Hora do Disparo:</strong> Quem fizer a melhor mão da rodada escolhe um adversário. O jogador escolhido aponta o revólver para <strong>si mesmo</strong>!</li>
          <li><strong>Probabilidade Crescente (1/6 → 2/6 → 3/6...):</strong> Se o tiro falhar (<em>*CLIQUE*</em>), uma nova munição entra no tambor. A chance passa para <strong>2/6</strong>, depois <strong>3/6</strong>, até <strong>6/6</strong>! Quando a bala dispara, o jogador perde 1 vida e o tambor volta para <strong>1/6</strong> (se ainda tiver vidas).</li>
@@ -567,6 +598,6 @@
 
   <script src="audio.js?v=bgm-wav-v2"></script>
   <script src="game.js?v=bgm-wav-v1"></script>
-  <script src="online.js?v=unique-character-pick-v1"></script>
+  <script src="online.js?v=bot-picker-v2"></script>
 </body>
 </html>

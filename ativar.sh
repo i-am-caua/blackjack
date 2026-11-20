@@ -30,6 +30,8 @@ server {
 
     location / {
         try_files $uri $uri/ =404;
+        # Nao guardar HTML/JS/CSS antigos no navegador: cada visita revalida.
+        expires -1;
     }
 }
 EOF

@@ -30,7 +30,14 @@ WINNER_SCREEN_SEC = 10.0
 LOBBY_STALE_SEC = 120.0
 
 SKINS = ["outlaw", "duchess", "cyber", "boss", "phantom"]
-BOT_NAMES = ["Bot-Billy", "Bot-Viper", "Bot-Zero", "Bot-Don", "Bot-Reaper"]
+# O bot usa o próprio nome do personagem, como se fosse mais um jogador da mesa.
+CHARACTER_NAMES = {
+    "outlaw": "Billy",
+    "duchess": "Viper",
+    "cyber": "Zero",
+    "boss": "Don",
+    "phantom": "Reaper",
+}
 
 # Textos curtos usados pelo painel e pelos chips (HABILIDADES.md §Textos curtos)
 KITS = {
@@ -71,7 +78,7 @@ KITS = {
         "role": "Morto-Vivo",
         "passive": ("ESPECTRO", "Com 1 vida, o tambor nunca passa de 2/6"),
         "charge": ("SEDE DE SANGUE", "3 BANGs = ficha"),
-        "active": ("SANGUE POR SANGUE", "Paga 1 vida: Maldição, Selo de Chumbo ou Boneco Vudú"),
+        "active": ("SANGUE POR SANGUE", "Paga 1 vida + 1 ficha: Maldição, Selo ou Boneco Vudú"),
         "marksMax": 3,
     },
 }
@@ -191,6 +198,10 @@ class RouletteRoom:
         self.resume_mode = None
         self.ability_seq = 0
         self.last_ability = None
+        self.boneco_curse = None  # Reaper: redireciona um disparo por até 5 rodadas
+
+        # Último alvo escolhido por cada bot (evita repetir a mesma vítima).
+        self.bot_last_targets = {}
 
     # ------------------------------------------------------------------ util
     def add_log(self, msg):
@@ -339,22 +350,47 @@ class RouletteRoom:
                 elif self.phase in ("CHOOSE_TARGET", "PLAYING_CARDS"):
                     self._check_after_elimination()
 
-    def add_bot(self):
+    def add_bot(self, skin=None):
         with self.lock:
             if self.phase != "LOBBY":
                 return False, "Só é possível adicionar bots no lobby."
             if len(self.players) >= MAX_PLAYERS:
                 return False, "Sala já atingiu 5 jogadores."
-            skin = self._pick_free_skin()
-            bot_idx = sum(1 for p in self.players if p["isBot"]) + 1
-            used_names = {p["nick"] for p in self.players}
-            name = next((n for n in BOT_NAMES if n not in used_names), f"Bot-{bot_idx}")
+
+            skin = (skin or "").strip() or None
+            if skin:
+                if skin not in SKINS:
+                    return False, "Personagem inválido."
+                owner = next((p for p in self.players if p["skin"] == skin), None)
+                if owner:
+                    name = CHARACTER_NAMES.get(skin, skin)
+                    return False, f"{name} já está na mesa."
+            else:
+                skin = self._pick_free_skin()
+                if skin is None:
+                    return False, "Não há personagem livre na mesa."
+
+            name = CHARACTER_NAMES.get(skin, "Bot")
             bot_id = f"bot_{int(time.time() * 1000)}_{random.randint(100, 999)}"
             self.players.append(self._make_player(
-                bot_id, name, skin, "127.0.0.1 (BOT)", "CPU", True
+                bot_id, name, skin, "BOT • CPU", "CPU", True
             ))
-            self.add_log(f"{name} entrou para completar a mesa.")
-            return True, "Bot adicionado."
+            self.add_log(f"{name} (BOT) entrou na mesa.")
+            return True, f"{name} entrou na mesa."
+
+    def remove_bot(self, bot_id):
+        with self.lock:
+            if self.phase != "LOBBY":
+                return False, "Só é possível remover bots no lobby."
+            bot = next(
+                (p for p in self.players if p["isBot"] and p["id"] == bot_id),
+                None,
+            )
+            if not bot:
+                return False, "Bot não encontrado."
+            self.players = [p for p in self.players if p["id"] != bot_id]
+            self.add_log(f"{bot['nick']} (BOT) saiu da mesa.")
+            return True, f"{bot['nick']} removido."
 
     def remove_bots(self):
         with self.lock:
@@ -376,6 +412,7 @@ class RouletteRoom:
             self.ability_seq = 0
             self.last_shot = None
             self.last_ability = None
+            self.boneco_curse = None
             self.winner_champion_id = None
             self.winner_screen_until = 0.0
             self.target_id = None
@@ -383,6 +420,7 @@ class RouletteRoom:
             self.prep = None
             self.spin_queue = []
             self.resume_mode = None
+            self.bot_last_targets = {}
             self.shoe = build_shoe(6)
             for p in self.players:
                 p.update({
@@ -570,6 +608,26 @@ class RouletteRoom:
             self.add_log(f"Vencedor(es) da rodada: {names}! Escolha quem vai encarar o revólver.")
             self._advance_to_next_shooter()
 
+    def _bot_pick_target(self, shooter, opponents, last_target=None):
+        """Escolha de alvo do bot: ameaça (tambor/vida/efeitos) + ruído.
+
+        O ruído resolve o empate total (ex.: todos em 1/6 e 3 vidas) de forma
+        aleatória, em vez de cair sempre no assento mais à esquerda. Humanos e
+        bots entram no mesmo sorteio.
+        """
+        def threat(p):
+            score = 2.0 * p["bullets"] - 1.0 * p["lives"]
+            if p.get("marcado"):
+                score += 2.0   # próximo giro dele causa 2 de dano
+            if p.get("selo"):
+                score += 1.0   # tambor dele está mais cheio
+            score += random.uniform(0.0, 1.6)
+            if len(opponents) > 1 and p["id"] == last_target:
+                score -= 1.5   # evita perseguir sempre a mesma pessoa
+            return score
+
+        return max(opponents, key=threat)
+
     def _advance_to_next_shooter(self):
         alive_ids = {p["id"] for p in self._alive()}
         if len(alive_ids) <= 1:
@@ -585,10 +643,63 @@ class RouletteRoom:
             if shooter and shooter["isBot"]:
                 opponents = [p for p in self._alive() if p["id"] != shooter["id"]]
                 if opponents:
-                    opponents.sort(key=lambda o: (-o["bullets"], o["lives"]))
-                    self._enter_prep(shooter["id"], opponents[0]["id"])
+                    target = self._bot_pick_target(
+                        shooter,
+                        opponents,
+                        self.bot_last_targets.get(shooter["id"]),
+                    )
+                    self.bot_last_targets[shooter["id"]] = target["id"]
+                    self._enter_prep(shooter["id"], target["id"])
         else:
+            if self._resolve_boneco_expiry_if_due():
+                return
             self._start_round()
+
+    def _arm_boneco(self, reaper, target):
+        reaper["lives"] -= 1
+        reaper["ficha"] = 0
+        self.boneco_curse = {
+            "reaperId": reaper["id"],
+            "targetId": target["id"],
+            # A rodada de ativação conta como 1/5; expira no fim de N + 4.
+            "expiresRound": self.round_num + 4,
+        }
+        self.add_log(
+            f"BONECO VUDÚ: {reaper['nick']} pagou 1 vida e 1 ficha e amaldiçoou "
+            f"{target['nick']} por 5 rodadas, contando esta. O primeiro disparo que "
+            "atingir o Reaper transfere o dano exato."
+        )
+        self._ability_event(
+            reaper,
+            "fx_boneco",
+            f"{target['nick']} foi amaldiçoado por 5 rodadas, contando esta",
+            target["id"],
+        )
+
+    def _resolve_boneco_expiry_if_due(self):
+        curse = self.boneco_curse
+        if not curse or self.round_num < curse["expiresRound"]:
+            return False
+
+        self.boneco_curse = None
+        reaper = self._find_player(curse["reaperId"])
+        if not reaper or not reaper["alive"]:
+            self.add_log("BONECO VUDÚ expirou sem transferência; o Reaper não está vivo para cumprir o giro.")
+            return False
+
+        self.add_log(
+            f"BONECO VUDÚ EXPIROU: {reaper['nick']} não transferiu nenhum disparo "
+            "em cinco rodadas; a maldição terminou. Ele deverá girar com no mínimo 5/6 "
+            "e este giro não transfere dano."
+        )
+        self._begin_spins([{
+            "pid": reaper["id"],
+            "killer": None,
+            "min_bullets": 5,
+            "bonecoPenalty": True,
+            "note": "PUNIÇÃO DO BONECO",
+        }], "ROUND")
+        return True
 
     def shoot(self, shooter_id, target_id):
         with self.lock:
@@ -654,7 +765,9 @@ class RouletteRoom:
                 continue
             if stage == 2 and (not target or target["id"] != p["id"]):
                 continue
-            if stage == 3 and (not target or target["id"] != p["id"]):
+            if stage == 3 and (
+                not target or target["id"] != p["id"] or self.boneco_curse
+            ):
                 continue
             result.append(p)
         return result
@@ -680,13 +793,18 @@ class RouletteRoom:
             else:
                 # Se o Reaper é o alvo, guarda a ficha para a etapa do Boneco Vudú.
                 self._complete_prep_stage(p, ready_after=False)
-        elif stage == 1 and target:
-            p["ficha"] = 0
-            p["streak"] = 0
-            target["marcado"] = True
-            target["marcadoOwner"] = p["id"]
-            self.add_log(f"MUNIÇÃO TURBINADA: {p['nick']} marcou {target['nick']} (próximo tiro causa 2).")
-            self._ability_event(p, "fx_municao", f"{p['nick']} marcou {target['nick']}", target["id"])
+        elif stage == 1:
+            others = [x for x in self._alive() if x["id"] != p["id"]]
+            chosen = target if target and target["id"] != p["id"] else (
+                random.choice(others) if others else None
+            )
+            if chosen:
+                p["ficha"] = 0
+                p["streak"] = 0
+                chosen["marcado"] = True
+                chosen["marcadoOwner"] = p["id"]
+                self.add_log(f"MUNIÇÃO TURBINADA: {p['nick']} marcou {chosen['nick']} (próximo tiro causa 2).")
+                self._ability_event(p, "fx_municao", f"{p['nick']} marcou {chosen['nick']}", chosen["id"])
             self._complete_prep_stage(p)
         elif stage == 2:
             if random.random() < 0.5:
@@ -701,16 +819,10 @@ class RouletteRoom:
             self._complete_prep_stage(p)
         elif stage == 3 and target:
             opponents = [x for x in self._alive() if x["id"] != p["id"]]
-            if opponents:
-                chosen = random.choice(opponents)
-                p["lives"] -= 1
-                p["ficha"] = 0
-                self.prep["extras"].append({
-                    "pid": chosen["id"], "min4": True, "killer": p["id"],
-                    "note": "BONECO VUDÚ",
-                })
-                self.add_log(f"BONECO VUDÚ: {p['nick']} pagou 1 vida; {chosen['nick']} gira junto (mínimo 4/6).")
-                self._ability_event(p, "fx_boneco", f"Boneco em {chosen['nick']}", chosen["id"])
+            current_odds = self._compute_bullets(p, {})
+            if opponents and not self.boneco_curse and p["lives"] >= 3 and current_odds >= 4:
+                chosen = min(opponents, key=lambda x: (x["lives"], -x["bullets"]))
+                self._arm_boneco(p, chosen)
             self._complete_prep_stage(p)
 
     def _advance_prep_stage(self):
@@ -785,6 +897,8 @@ class RouletteRoom:
             bullets += 1
         if spin.get("min4"):
             bullets = max(bullets, 4)
+        if spin.get("min_bullets"):
+            bullets = max(bullets, int(spin["min_bullets"]))
         if spin.get("plus1"):
             bullets += 1
         if p["skin"] == "phantom" and p["lives"] == 1:
@@ -847,6 +961,7 @@ class RouletteRoom:
 
         dmg = 2 if target["marcado"] else 1
         was_marked = target["marcado"]
+        marked_owner_id = target.get("marcadoOwner")
         if was_marked:
             target["marcado"] = False
             target["marcadoOwner"] = None
@@ -854,49 +969,107 @@ class RouletteRoom:
         eliminated = False
         guard_absorbed = False
         pulso = None
+        damage_target = target
+        damage_redirected = False
+
+        active_curse = self.boneco_curse
+        if (
+            fired
+            and not spin.get("bonecoPenalty")
+            and active_curse
+            and active_curse.get("reaperId") == target["id"]
+        ):
+            cursed_target = self._find_player(active_curse.get("targetId"))
+            if cursed_target and cursed_target["alive"]:
+                damage_target = cursed_target
+                damage_redirected = True
+                self.boneco_curse = None
+                target["bullets"] = 1
+                self.add_log(
+                    f"BONECO VUDÚ: o disparo contra {target['nick']} ({odds_before}) "
+                    f"transferiu {dmg} dano(s) para {cursed_target['nick']}!"
+                )
+                self._ability_event(
+                    target,
+                    "fx_boneco",
+                    f"{dmg} dano(s) transferido(s) para {cursed_target['nick']}",
+                    cursed_target["id"],
+                )
+
+        damage_target_lives_before = damage_target["lives"]
+        damage_target_eliminated = False
 
         if fired:
             self._register_bang()
-            if dmg >= target["lives"] and target["guard"]:
-                target["guard"] = False
-                target["guardUsed"] = True
-                target["ficha"] = 0
-                target["lives"] = 1
-                target["bullets"] = 3
+            if dmg >= damage_target["lives"] and damage_target["guard"]:
+                damage_target["guard"] = False
+                damage_target["guardUsed"] = True
+                damage_target["ficha"] = 0
+                damage_target["lives"] = 1
+                damage_target["bullets"] = 3
                 guard_absorbed = True
-                odds_after = "3/6"
+                if damage_redirected:
+                    target["bullets"] = 1
+                    odds_after = "1/6"
+                else:
+                    odds_after = "3/6"
                 self._ability_event(
-                    target, "fx_guarda",
-                    f"O capanga de {target['nick']} morreu no lugar dele",
-                    target["id"],
+                    damage_target, "fx_guarda",
+                    f"O capanga de {damage_target['nick']} morreu no lugar dele",
+                    damage_target["id"],
                 )
                 self.add_log(
-                    f"GUARDA-COSTAS! O capanga de {target['nick']} morreu no lugar dele. "
+                    f"GUARDA-COSTAS! O capanga de {damage_target['nick']} morreu no lugar dele. "
                     f"Ele ficou com 1 vida e o tambor vai para 3/6."
                 )
             else:
-                target["lives"] = max(0, target["lives"] - dmg)
-                if target["lives"] == 0:
-                    target["alive"] = False
-                    target["chambers"] = 0
-                    target["bullets"] = 0
-                    eliminated = True
+                damage_target["lives"] = max(0, damage_target["lives"] - dmg)
+                if damage_redirected:
+                    target["bullets"] = 1
+                if damage_target["lives"] == 0:
+                    damage_target["alive"] = False
+                    damage_target["chambers"] = 0
+                    damage_target["bullets"] = 0
+                    damage_target_eliminated = True
+                    eliminated = not damage_redirected
                     odds_after = "ELIMINADO"
-                    killer = self._find_player(spin.get("killer")) if spin.get("killer") else None
+                    killer_id = spin.get("killer")
+                    if spin.get("bonecoPenalty"):
+                        killer_id = None
+                    elif damage_redirected:
+                        killer_id = marked_owner_id or target["id"]
+                    killer = self._find_player(killer_id) if killer_id else None
                     if killer:
                         killer["kills"] += 1
-                    self.add_log(
-                        f"BANG! {target['nick']} atirou em si mesmo ({odds_before})"
-                        f"{' com dano 2' if dmg == 2 else ''} e foi ELIMINADO!"
-                    )
+                    if damage_redirected:
+                        self.add_log(
+                            f"BANG! {damage_target['nick']} foi eliminado pelo dano "
+                            f"transferido do tiro de {target['nick']} ({odds_before})!"
+                        )
+                    else:
+                        self.add_log(
+                            f"BANG! {target['nick']} atirou em si mesmo ({odds_before})"
+                            f"{' com dano 2' if dmg == 2 else ''} e foi ELIMINADO!"
+                        )
                 else:
-                    target["bullets"] = 1
-                    odds_after = "1/6"
-                    self.add_log(
-                        f"BANG! {target['nick']} atirou em si mesmo ({odds_before})"
-                        f"{' com dano 2' if dmg == 2 else ''}! "
-                        f"Restam {target['lives']} vidas (tambor voltou a 1/6)."
+                    if not damage_redirected:
+                        target["bullets"] = 1
+                    odds_after = (
+                        f"{self._compute_bullets(target, {})}/6"
+                        if damage_redirected else f"{target['bullets']}/6"
                     )
+                    if damage_redirected:
+                        self.add_log(
+                            f"BANG! {target['nick']} não perdeu vida; o dano foi transferido. "
+                            f"{damage_target['nick']} perdeu {dmg} vida(s) e ficou com "
+                            f"{damage_target['lives']}."
+                        )
+                    else:
+                        self.add_log(
+                            f"BANG! {target['nick']} atirou em si mesmo ({odds_before})"
+                            f"{' com dano 2' if dmg == 2 else ''}! "
+                            f"Restam {target['lives']} vidas (tambor voltou a 1/6)."
+                        )
         else:
             target["shotsSurvived"] += 1
             next_bullets = bullets_before + 1
@@ -927,6 +1100,8 @@ class RouletteRoom:
 
         if target["skin"] == "duchess" and target["lives"] < lives_before_shot:
             target["pulsoUsed"] = False
+        if damage_redirected and damage_target["skin"] == "duchess" and damage_target["lives"] < damage_target_lives_before:
+            damage_target["pulsoUsed"] = False
 
         # Sangue Frio conta qualquer giro iniciado em 4/6 ou 5/6 que a Viper
         # sobreviva, inclusive um BANG que ainda deixe vidas.
@@ -944,11 +1119,15 @@ class RouletteRoom:
                 )
 
         self.shot_seq += 1
+        shot_chooser_id = spin.get("killer")
+        if shot_chooser_id is None and not spin.get("bonecoPenalty"):
+            shot_chooser_id = self.chooser_id
+        shot_chooser = self._find_player(shot_chooser_id) if shot_chooser_id else None
         self.last_shot = {
             "seq": self.shot_seq,
-            "chooserId": spin.get("killer") or self.chooser_id,
-            "chooserNick": (self._find_player(spin.get("killer") or self.chooser_id) or {}).get("nick", ""),
-            "chooserSkin": (self._find_player(spin.get("killer") or self.chooser_id) or {}).get("skin", ""),
+            "chooserId": shot_chooser_id,
+            "chooserNick": (shot_chooser or {}).get("nick", ""),
+            "chooserSkin": (shot_chooser or {}).get("skin", ""),
             "shooterId": target["id"],
             "shooterNick": target["nick"],
             "shooterSkin": target["skin"],
@@ -959,16 +1138,25 @@ class RouletteRoom:
             "eliminated": eliminated,
             "guardAbsorbed": guard_absorbed,
             "damage": dmg,
+            "damageRedirected": damage_redirected,
+            "damageTargetId": damage_target["id"],
+            "damageTargetNick": damage_target["nick"],
+            "damageTargetSkin": damage_target["skin"],
+            "damageTargetLivesBefore": damage_target_lives_before,
+            "damageTargetLivesLeft": damage_target["lives"],
+            "damageTargetEliminated": damage_target_eliminated,
             "wasMarked": was_marked,
             "pulso": pulso,
             "oddsBefore": odds_before,
             "oddsAfter": odds_after,
+            "livesBefore": lives_before_shot,
             "livesLeft": target["lives"],
             "bulletCountBefore": bullets_before,
             "chamberIndex": chamber_index,
             "source": spin.get("note") or ("MALDICAO" if spin.get("curse") else "RODADA"),
             "isExtra": bool(spin.get("note")),
             "curse": bool(spin.get("curse")),
+            "bonecoPenalty": bool(spin.get("bonecoPenalty")),
         }
         self.phase = "ROULETTE_SHOT"
         self.phase_started_at = time.time()
@@ -996,6 +1184,10 @@ class RouletteRoom:
     def _check_after_elimination(self):
         alive = self._alive()
         if len(alive) <= 1:
+            # Se o prazo venceu no fim da quinta rodada, a punição do Boneco
+            # ainda resolve antes de declarar o Reaper como último sobrevivente.
+            if self._resolve_boneco_expiry_if_due():
+                return
             self._finish_match()
         else:
             self._advance_to_next_shooter()
@@ -1007,6 +1199,7 @@ class RouletteRoom:
         self.winner_screen_until = self.phase_started_at + WINNER_SCREEN_SEC
         self.prep = None
         self.spin_queue = []
+        self.boneco_curse = None
         if alive:
             champ = alive[0]
             self.winner_champion_id = champ["id"]
@@ -1031,6 +1224,8 @@ class RouletteRoom:
             self.prep = None
             self.spin_queue = []
             self.resume_mode = None
+            self.boneco_curse = None
+            self.bot_last_targets = {}
             self.winner_champion_id = None
             self.winner_screen_until = 0.0
             for p in self.players:
@@ -1082,7 +1277,11 @@ class RouletteRoom:
                 and any(x["alive"] and x["id"] != p["id"] and x["hand"] for x in self.players)
             )
         elif skin == "phantom":
-            flags["sangue"] = self.phase == "PREP" and p["lives"] >= 2 and stage_actor and stage in (0, 3)
+            boneco_available = not (stage == 3 and self.boneco_curse)
+            flags["sangue"] = (
+                self.phase == "PREP" and p["lives"] >= 2 and stage_actor
+                and stage in (0, 3) and boneco_available
+            )
         return flags
 
     def use_ability(self, client_id, kind, target_id=None, mode=None, card_index=None):
@@ -1106,8 +1305,8 @@ class RouletteRoom:
                 if not self.prep or self.prep.get("stage") != 1 or self.prep.get("actorId") != p["id"]:
                     return False, "Aguarde a etapa do Billy na preparação."
                 target = self._find_player(target_id)
-                if not target or not target["alive"]:
-                    return False, "Alvo inválido."
+                if not target or not target["alive"] or target["id"] == p["id"]:
+                    return False, "Escolha outro jogador vivo."
                 p["ficha"] = 0
                 p["streak"] = 0  # usar a habilidade reinicia a sequência
                 target["marcado"] = True
@@ -1224,6 +1423,8 @@ class RouletteRoom:
                         return False, "Alvo inválido."
                 if mode == "boneco" and self.target_id != p["id"]:
                     return False, "Boneco Vudú só quando o Reaper for escolhido para girar."
+                if mode == "boneco" and self.boneco_curse:
+                    return False, "Já existe um Boneco Vudú ativo; não é possível acumular maldições."
 
                 p["lives"] -= 1
                 p["ficha"] = 0
@@ -1258,18 +1459,10 @@ class RouletteRoom:
                     }], "PREP")
                     return True, "Maldição lançada."
 
-                # boneco
-                self.prep["extras"].append({
-                    "pid": target["id"], "min4": True, "killer": p["id"],
-                    "note": "BONECO VUDÚ",
-                })
-                self.add_log(
-                    f"BONECO VUDÚ: {p['nick']} pagou 1 vida; {target['nick']} gira junto (mínimo 4/6)."
-                )
-                self._ability_event(p, "fx_boneco", f"Boneco em {target['nick']}", target["id"])
+                self._arm_boneco(p, target)
                 self._complete_prep_stage(p)
                 self._maybe_end_prep()
-                return True, "Boneco Vudú armado."
+                return True, f"{target['nick']} está amaldiçoado por 5 rodadas."
 
             return False, "Habilidade desconhecida."
 
@@ -1310,6 +1503,14 @@ class RouletteRoom:
                 elif p["skin"] == "phantom":
                     marks = p["blood"]
 
+                # Munição efetiva para exibição: já inclui Selo de Chumbo e o
+                # teto do Espectro, para o tambor/chance nunca mentirem.
+                eff_bullets = (
+                    self._compute_bullets(p, {})
+                    if p["alive"] and p["chambers"] > 0
+                    else 0
+                )
+
                 players_out.append({
                     "id": p["id"],
                     "nick": p["nick"],
@@ -1319,8 +1520,8 @@ class RouletteRoom:
                     "isBot": p["isBot"],
                     "lives": p["lives"],
                     "chambers": p["chambers"],
-                    "bullets": p["bullets"],
-                    "odds": f"{p['bullets']}/{p['chambers']}" if p["alive"] and p["chambers"] > 0 else "0",
+                    "bullets": eff_bullets,
+                    "odds": f"{eff_bullets}/{p['chambers']}" if p["alive"] and p["chambers"] > 0 else "0",
                     "alive": p["alive"],
                     "hand": p["hand"],
                     "score": sc,
@@ -1334,6 +1535,16 @@ class RouletteRoom:
                     "marcado": p["marcado"],
                     "marks": marks,
                     "marksMax": kit["marksMax"],
+                    "bonecoMarked": bool(
+                        self.boneco_curse
+                        and self.boneco_curse.get("targetId") == p["id"]
+                    ),
+                    "bonecoRounds": (
+                        max(0, self.boneco_curse["expiresRound"] - self.round_num + 1)
+                        if self.boneco_curse
+                        and self.boneco_curse.get("targetId") == p["id"]
+                        else 0
+                    ),
                     # segredos: só para o próprio jogador
                     "ficha": p["ficha"] if is_viewer else 0,
                     "guard": p["guard"] if is_viewer else False,
@@ -1359,6 +1570,17 @@ class RouletteRoom:
                     sealed = [p["nick"] for p in self.players if p["selo"]]
                     if sealed:
                         effect = "SELO ATIVO: " + ", ".join(sealed)
+                if self.boneco_curse:
+                    if self.boneco_curse.get("reaperId") == viewer["id"]:
+                        cursed_target = self._find_player(self.boneco_curse.get("targetId"))
+                        target_name = cursed_target["nick"] if cursed_target else "alvo"
+                        remaining = max(
+                            0,
+                            self.boneco_curse["expiresRound"] - self.round_num + 1,
+                        )
+                        effect = f"BONECO ATIVO: {target_name} • {remaining}/5 rodada(s)"
+                    elif self.boneco_curse.get("targetId") == viewer["id"]:
+                        effect = "VOCÊ ESTÁ AMALDIÇOADO PELO BONECO VUDÚ"
 
                 me = {
                     "id": viewer["id"],
@@ -1438,6 +1660,15 @@ class BlackjackHandler(http.server.SimpleHTTPRequestHandler):
         # Quiet request logging except errors
         pass
 
+    def end_headers(self):
+        # HTML/CSS/JS mudam com frequência: nunca deixar o navegador reusar
+        # uma versão antiga em cache (o /api/ já manda no-store).
+        if not self.path.startswith("/api/"):
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+        super().end_headers()
+
     def _client_info(self):
         xff = self.headers.get("X-Forwarded-For", "").split(",")[0].strip()
         xri = self.headers.get("X-Real-IP", "").strip()
@@ -1495,8 +1726,10 @@ class BlackjackHandler(http.server.SimpleHTTPRequestHandler):
         elif parsed.path == "/api/roulette/bot":
             if body.get("remove"):
                 ok, msg = ROOM.remove_bots()
+            elif body.get("removeBot"):
+                ok, msg = ROOM.remove_bot(str(body.get("removeBot")))
             else:
-                ok, msg = ROOM.add_bot()
+                ok, msg = ROOM.add_bot(body.get("skin"))
         elif parsed.path == "/api/roulette/start":
             ok, msg = ROOM.start_match()
         elif parsed.path == "/api/roulette/action":

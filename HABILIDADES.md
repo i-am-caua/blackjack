@@ -3,8 +3,8 @@
 Documento de design das habilidades dos personagens.
 
 **Status:** 5 de 5 personagens definidos, com passiva própria e ativa fechadas.
-
-Os cinco kits estão completos. O próximo passo é a implementação.
+As regras de resolução estão definidas; a implementação do modo online está em
+andamento.
 
 ---
 
@@ -73,10 +73,12 @@ uma mexe apenas no próprio estado):
 Fase curta de ~8 segundos entre a escolha do alvo e o sorteio da câmara. É a única
 janela em que as ativas podem ser usadas. Ordem:
 
-1. **Reaper** — paga 1 vida e escolhe **Maldição** ou **Selo de Chumbo**.
+1. **Reaper** — paga 1 vida e 1 ficha para escolher **Maldição** ou **Selo de
+   Chumbo**.
 2. **Billy** — gasta a ficha e marca um alvo.
 3. **Viper** — se for ela a girar, o botão `ROLETA DE CABEÇAS` aparece; ela decide.
-4. **Reaper** — se for ele a girar, pode usar **Boneco Vudú**.
+4. **Reaper** — se for ele a girar, pode pagar 1 vida e 1 ficha para usar
+   **Boneco Vudú** em outro jogador vivo.
 5. A janela fecha (todos confirmaram ou o tempo acabou) e o disparo é rolado.
 
 **Regras da janela:**
@@ -91,7 +93,8 @@ janela em que as ativas podem ser usadas. Ordem:
 Antes de sortear a câmara, aplica-se nesta ordem:
 
 1. **Selo de Chumbo**: `+1` bala.
-2. **"No mínimo 4/6"** (Maldição / Boneco Vudú): sobe até 4/6 se estiver abaixo.
+2. **Mínimos forçados**: Maldição sobe até `4/6`; a punição por expiração do
+   Boneco Vudú sobe até `5/6`, se estiver abaixo.
 3. **`+1` da Roleta de Cabeças**.
 4. **Teto do Espectro** (Reaper com exatamente 1 vida): corta em `2/6` —
    **sempre por último**.
@@ -123,17 +126,19 @@ A Maldição é a única ativa que **interrompe a rodada**:
 | **Munição Turbinada** (Billy) | marca consumida no giro do alvo, **mesmo em clique** |
 | **Guarda-Costas** (Don) | consumido ao absorver |
 
-#### Fase 9 — Giros extras
+#### Fase 9 — Giro extra
 
 - **Roleta de Cabeças**: o giro da Viper resolve **primeiro**; o do sorteado
   **depois** — mesmo que ela morra no próprio giro.
-- **Boneco Vudú**: o giro do Reaper resolve **primeiro**; o do boneco **depois** —
-  mesmo que ele morra no próprio giro.
-- Cada giro extra passa de novo pelas Fases 6, 7 e 8, de forma independente.
+- O giro extra passa de novo pelas Fases 6, 7 e 8, de forma independente.
 
 #### Fase 10 — Fim da rodada
 
-Eliminações → checagem de fim de jogo → próxima rodada.
+Eliminações → efeitos vencidos → checagem de fim de jogo → próxima rodada.
+
+Se o Boneco Vudú completar cinco rodadas sem transferir dano, a maldição termina
+antes da punição. O Reaper faz um giro forçado com no mínimo `5/6`; esse giro não
+transfere dano. O Espectro continua sendo aplicado por último.
 
 ### Interações resolvidas
 
@@ -142,10 +147,12 @@ Eliminações → checagem de fim de jogo → próxima rodada.
 | **Munição Turbinada + Guarda-Costas** | dano 2 é fatal → capanga morre, Don fica com 1 vida, tambor `3/6` |
 | **Roleta de Cabeças + Guarda-Costas** | se o sorteio cair no Don e o tiro for fatal, o capanga absorve |
 | **Maldição + Guarda-Costas** | o giro forçado é normal; se for fatal, o capanga absorve |
+| **Boneco Vudú + Munição Turbinada** | se o disparo atingir o Reaper, os 2 danos são transferidos; o amaldiçoado pode ser eliminado com 2 vidas |
+| **Boneco Vudú + Guarda-Costas** | se o dano transferido for fatal para o Don, o capanga absorve; a transferência encerra o Boneco |
 | **Espectro + Selo de Chumbo** | o teto de `2/6` vence — o Selo não carrega o fantasma |
 | **Espectro + Roleta de Cabeças** | o `+1` entra e o teto corta em `2/6` |
-| **Espectro + Maldição / Boneco** | não acontece: o Reaper não pode escolher a si mesmo |
-| **Pulso Firme + Selo / Maldição / Boneco** | não se aplica: o giro não começa em `1/6` |
+| **Espectro + punição do Boneco** | o mínimo de `5/6` é aplicado antes do teto; com 1 vida, o giro fica em `2/6` |
+| **Pulso Firme + Selo / Maldição / punição do Boneco** | não se aplica: o giro não começa em `1/6` |
 | **Pulso Firme + Roleta sorteando a própria Viper** | não se aplica: ela começa em `2/6` |
 | **Marca do Billy em quem morre antes de girar** | a marca é perdida |
 | **Reaper pagando 1 vida** | o Espectro liga na hora — o giro dele já sai com teto `2/6` |
@@ -156,7 +163,7 @@ Eliminações → checagem de fim de jogo → próxima rodada.
 
 ---
 
-## Billy — Outlaw
+## Billy — Pistoleiro
 
 ### Apresentação — tela de seleção
 
@@ -220,7 +227,8 @@ A sequência reinicia quando ele:
 
 ### Ativa — Munição Turbinada
 
-Billy pode gastar a ficha **quando quiser** e escolher um jogador vivo.
+Billy pode gastar a ficha **quando quiser** e escolher **outro** jogador vivo
+(ele não pode marcar a si mesmo).
 
 Na próxima roletada desse jogador:
 
@@ -232,6 +240,7 @@ Na próxima roletada desse jogador:
 
 - Não acumula duas fichas.
 - Não pode ser ativada depois que o tambor começou a girar.
+- O alvo precisa ser outro jogador vivo — Billy não pode marcar a si mesmo.
 - O alvo deve ser avisado visualmente de que está sob efeito de dano duplo.
 - Pode eliminar um jogador que esteja com 2 vidas.
 
@@ -247,7 +256,7 @@ Efeito consumido
 
 ---
 
-## Viper — Duchess
+## Viper — Duquesa
 
 ### Apresentação — tela de seleção
 
@@ -257,7 +266,7 @@ Efeito consumido
 
 **Descrição — aparece ao abrir o card:**
 
-Dona de um barco-cassino que sobe e desce o rio, a Duchess aprendeu a contar
+Dona de um barco-cassino que sobe e desce o rio, a Duquesa aprendeu a contar
 cartas antes de aprender a ler. Foi traída pelo próprio sócio, enterrada numa
 cova rasa e voltou — dizem que com a ajuda de um veneno que ninguém deveria ter
 tomado. Hoje ela não joga para ganhar: joga para descobrir até onde os outros
@@ -455,7 +464,7 @@ entregando uma carta boa e recebendo uma ruim.
 
 ---
 
-## Don — Boss
+## Don — Chefão
 
 ### Apresentação — tela de seleção
 
@@ -548,7 +557,7 @@ próximo tiro. Não vira tanque, vira segunda chance.
 
 ---
 
-## Reaper — Phantom
+## Reaper — Morto-Vivo
 
 ### Apresentação — tela de seleção
 
@@ -568,7 +577,7 @@ se a morte não soubesse o que fazer com ele. Os outros jogadores aprenderam que
 |---|---|---|
 | Passiva | **Espectro** | Com 1 vida, o tambor nunca passa de 2/6 |
 | Carga | **Sede de Sangue** | 3 BANGs = 1 ficha (máx 1 guardada) |
-| Ativa | **Sangue por Sangue** | Paga 1 vida (precisa ter 2+) e escolhe uma maldição |
+| Ativa | **Sangue por Sangue** | Paga 1 vida (precisa ter 2+) e 1 ficha para escolher uma maldição |
 
 ### Passiva — Espectro
 
@@ -598,7 +607,7 @@ se a morte não soubesse o que fazer com ele. Os outros jogadores aprenderam que
 
 ### Ativa — Sangue por Sangue
 
-- Custa **1 vida** e exige ter **2 ou mais**.
+- Custa **1 vida e 1 ficha** e exige ter **2 ou mais vidas**.
 - Escolhe **um dos três modos** abaixo.
 - Só pode ser usada antes de o tambor começar a girar.
 
@@ -629,20 +638,27 @@ Selo:       2/6 → 3/6 → 4/6 → 5/6 → 6/6
 
 #### Modo 3 — Boneco Vudú
 
-Quando o Reaper for escolhido para girar, ele escolhe **naquele momento** um
-jogador vivo para girar junto.
+Quando o Reaper for escolhido para girar, ele pode pagar **1 vida e 1 ficha** e
+amaldiçoar outro jogador vivo. A rodada em que a habilidade é ativada conta como
+a primeira das cinco rodadas do prazo. A ativação não acrescenta munição ao
+tambor do Reaper.
 
-- O Reaper gira com a quantidade **normal** do tambor dele.
-- O escolhido gira com **no mínimo 4/6**.
-- O giro do Reaper resolve primeiro; o do boneco depois.
-- O boneco gira **mesmo que o Reaper morra** no próprio disparo.
-- Depois do giro, o tambor do boneco volta ao normal.
+Durante o prazo, se um disparo atingir o Reaper, o dano exato daquele disparo é
+transferido para o jogador amaldiçoado. O Reaper não perde vida nesse disparo, e
+o Boneco termina depois da transferência. Se o dano transferido for fatal para o
+Don, o Guarda-Costas pode absorvê-lo normalmente. Munição Turbinada transfere
+seus **2 danos** completos e pode eliminar um amaldiçoado com 2 vidas.
+
+Se nenhum disparo for transferido até o fim da quinta rodada, a maldição termina
+antes de o Reaper fazer um giro forçado com **no mínimo 5/6**. Esse giro não pode
+transferir dano. O Espectro continua valendo: com 1 vida, o teto de `2/6` reduz
+a chance efetiva do giro de punição.
 
 ```text
-Reaper é escolhido (2/6, 2 vidas)
-→ paga 1 vida e escolhe Don
-→ Reaper gira em 2/6
-→ Don gira em 4/6
+Reaper é escolhido para girar (2 vidas)
+→ paga 1 vida e 1 ficha; amaldiçoa Don (rodada 1/5)
+→ um BANG atinge o Reaper e transfere 1 dano ao Don
+→ o Boneco termina; o Reaper não perde vida
 ```
 
 ### Interações
@@ -651,7 +667,8 @@ Reaper é escolhido (2/6, 2 vidas)
 |---|---|
 | Reaper com 1 vida usando Sangue por Sangue | Não pode — exige 2 ou mais |
 | Selo de Chumbo + Espectro | Não se aplicam juntos (são de personagens diferentes) |
-| Boneco Vudú em alguém com 5/6 | Continua em 5/6 ("no mínimo 4/6") |
+| Reaper com 1 vida na punição do Boneco | O mínimo de `5/6` é aplicado e depois o Espectro limita o giro a `2/6` |
+| Punição do Boneco | A maldição termina antes do giro; o tiro forçado nunca transfere dano |
 
 ---
 
@@ -670,7 +687,7 @@ Reaper é escolhido (2/6, 2 vidas)
 
 Cada card de personagem mostra, de cima para baixo:
 
-1. retrato, nome e papel (`Outlaw`, `Duchess`, `Forasteiro`, `Boss`, `Phantom`);
+1. retrato, nome e papel (`Pistoleiro`, `Duquesa`, `Forasteiro`, `Chefão`, `Morto-Vivo`);
    o papel é só exibição — o id interno do Zero continua `cyber` no código;
 2. a **frase de efeito** — uma linha, a manchete do personagem;
 3. a **tabela de habilidades** com uma linha para cada parte;
@@ -690,7 +707,7 @@ celular):
 
 ```text
 ┌──────────────────────────────────┐
-│ BILLY — Outlaw                   │
+│ BILLY — Pistoleiro               │
 │                                  │
 │ MÃO DO DIABO                     │
 │ Mão inicial 16 → −1 bala         │
@@ -719,15 +736,15 @@ celular):
 Versão reduzida, visível para todos:
 
 - nome do personagem sempre visível;
-- chips de estado: `SETES 1/2`, `SELO`, `MARCADO`, `MARCA 2/3`;
+- chips de estado: `SETES 1/2`, `SELO`, `MARCADO`, `AMALDIÇOADO 5/5`, `MARCA 2/3`;
 - `GUARDA-COSTAS ARMADO` aparece **só no card do Don**.
 
 ### Avisos de alvo
 
 - O alvo de qualquer habilidade recebe destaque visual na hora.
 - O log anuncia a ativação, o alvo e o resultado.
-- Sorteios (Viper, Viper 75%, Boneco Vudú) mostram o resultado na tela, mesmo
-  quando dão "nada".
+- Ativações e sorteios mostram o alvo, o resultado e o prazo na tela; o estado
+  do Boneco Vudú é público.
 
 ### Textos curtos (para implementação)
 
@@ -737,7 +754,7 @@ Versão reduzida, visível para todos:
 | **Viper** | 75% de não subir a bala no 1/6 (1× por vida) | Sobreviver a um giro em 4/6 ou 5/6 = ficha | Sorteia alguém: +1 bala e roleta |
 | **Zero** | Mão inicial 12–16 revela a próxima carta | 1 ficha a cada 5 rodadas | Troca uma carta com um alvo |
 | **Don** | Com um 7 na mão, empate é vitória sua | 7 na mão inicial = marca (2 = ficha) | Capanga morre no seu lugar, você fica com 1 vida |
-| **Reaper** | Com 1 vida, o tambor nunca passa de 2/6 | 3 BANGs = ficha | Paga 1 vida: Maldição, Selo de Chumbo ou Boneco Vudú |
+| **Reaper** | Com 1 vida, o tambor nunca passa de 2/6 | 3 BANGs = ficha | Paga 1 vida e 1 ficha: Maldição, Selo de Chumbo ou Boneco Vudú |
 
 ---
 
@@ -805,11 +822,9 @@ Os estados "vazio / gasto" não precisam de sprite novo: o mesmo PNG com
 
 ---
 
-## Próximos passos
+## Implementação
 
-1. Definir a ordem de resolução entre habilidades que se cruzam.
-2. Implementar no servidor e no cliente:
-   - `server.py` — estado das fichas, marcas e efeitos, com payload por jogador;
-   - `online.js` — painel de habilidade permanente, botões, avisos e sorteios;
-   - `index.html` — cards de seleção com apresentação e textos curtos;
-   - `style.css` — painel, chips de estado e destaque de alvo marcado.
+A ordem de resolução está definida. A integração do modo online está em
+andamento em `server.py`, `online.js`, `index.html` e `style.css`. O Boneco Vudú
+segue a regra de transferência de dano durante cinco rodadas e a punição por
+expiração descritas acima.

@@ -17,6 +17,7 @@
     boss: "Don",
     phantom: "Reaper",
   };
+  const SKIN_ORDER = ["outlaw", "duchess", "cyber", "boss", "phantom"];
 
   // Usado apenas se o servidor ainda não enviou o kit (ex.: primeira conexão).
   const FALLBACK_KITS = {
@@ -57,7 +58,7 @@
       role: "Morto-Vivo",
       passive: ["ESPECTRO", "Com 1 vida, o tambor nunca passa de 2/6"],
       charge: ["SEDE DE SANGUE", "3 BANGs = ficha"],
-      active: ["SANGUE POR SANGUE", "Paga 1 vida: Maldição, Selo de Chumbo ou Boneco Vudú"],
+      active: ["SANGUE POR SANGUE", "Paga 1 vida + 1 ficha: Maldição, Selo ou Boneco Vudú"],
       marksMax: 3,
     },
   };
@@ -86,7 +87,7 @@
     phantom: {
       passive: "Com exatamente 1 vida, o tambor final nunca passa de 2/6, mesmo após Selo, mínimo 4/6 ou +1 bala. O tiro acontece normalmente; não é escudo.",
       charge: "Cada BANG em qualquer jogador dá 1 marca, inclusive os absorvidos pelo Guarda-Costas e os que acertam o Reaper. Três marcas geram 1 ficha; guarda no máximo 1. A vida limita o uso a duas vezes por partida.",
-      active: "Só na preparação; custa 1 vida e exige 2 ou mais, além de gastar a ficha. Maldição força outro jogador vivo a girar imediatamente com mínimo 4/6 e depois volta o tambor a 1/6 (Guarda-Costas deixa 3/6). Selo dá +1 bala a cada giro do alvo até o fim da partida, máximo 6/6. Boneco só quando o Reaper vai girar: ele gira normalmente primeiro; outro vivo gira depois com mínimo 4/6, mesmo se o Reaper morrer.",
+      active: "Só na preparação; cada modo custa 1 vida (é preciso ter 2 ou mais) e 1 ficha. Maldição força outro jogador vivo a girar imediatamente com mínimo 4/6 e depois volta o tambor a 1/6 (Guarda-Costas deixa 3/6). Selo dá +1 bala a cada giro do alvo até o fim da partida, máximo 6/6. Boneco: somente quando o Reaper for escolhido para girar; amaldiçoa outro jogador vivo por cinco rodadas, contando a atual, sem acrescentar munição ao tambor. Se um disparo atingir o Reaper durante o prazo, o dano exato (inclusive os 2 da Munição Turbinada) é transferido e o efeito termina. O Guarda-Costas do Don pode absorver dano fatal transferido. Sem transferência até o fim da quinta rodada, a maldição acaba antes de o Reaper girar com no mínimo 5/6; com 1 vida, o Espectro limita o giro a 2/6. A punição não transfere dano.",
     },
   };
 
@@ -115,6 +116,7 @@
     active: false,
     pollTimer: null,
     lastState: null,
+    preShotState: null,
     lastShotSeq: 0,
     shotAnimUntil: 0,
     shotResultAt: 0,
@@ -177,6 +179,11 @@
     btnClearBots: document.getElementById("btn-rl-clear-bots"),
     btnLeave: document.getElementById("btn-rl-leave"),
     btnStart: document.getElementById("btn-rl-start"),
+
+    // Modal de adicionar bot
+    botModal: document.getElementById("rl-bot-modal"),
+    botModalOptions: document.getElementById("rl-bot-modal-options"),
+    botModalCancel: document.getElementById("rl-bot-modal-cancel"),
 
     btnBackLobby: document.getElementById("btn-rl-back-lobby"),
     roundNum: document.getElementById("rl-round-num"),
@@ -338,6 +345,16 @@
 
   function updateSkinSelectionUI(players) {
     const roster = players || (rl.lastState && rl.lastState.players) || [];
+    // Se o personagem selecionado acabou de ser ocupado (por um bot ou outro
+    // jogador) e você ainda não entrou, pula para o primeiro personagem livre.
+    const isJoined = roster.some((p) => p.id === rl.clientId);
+    if (!isJoined && skinOwner(rl.skin, roster)) {
+      const freeSkin = SKIN_ORDER.find((skin) => !skinOwner(skin, roster));
+      if (freeSkin) {
+        rl.skin = freeSkin;
+        localStorage.setItem("pixel_bj_skin", rl.skin);
+      }
+    }
     el.skinCards.forEach((card) => {
       const owner = skinOwner(card.dataset.skin, roster);
       const active = card.dataset.skin === rl.skin && !owner;
@@ -355,7 +372,9 @@
       card.setAttribute("aria-pressed", active ? "true" : "false");
       card.setAttribute("aria-disabled", owner ? "true" : "false");
     });
-    syncSharedCharacterDetails(rl.skin);
+    // A seleção do card e o painel de detalhes são estados independentes.
+    // Preserve o personagem que o painel já está mostrando durante o polling.
+    syncSharedCharacterDetails();
   }
 
   function syncSharedCharacterDetails(skin) {
@@ -482,12 +501,14 @@
       if (shot.fired) {
         AudioFX.playGunshot();
         if (shot.guardAbsorbed) {
-          showSeatHappy(shot.shooterId, `guard:${shot.seq}`);
+          showSeatHappy(shot.damageTargetId || shot.shooterId, `guard:${shot.seq}`);
+        } else if (shot.damageRedirected) {
+          showSeatHappy(shot.shooterId, `boneco:${shot.seq}`);
         } else if (shot.chooserId && shot.chooserId !== shot.shooterId) {
           showSeatHappy(shot.chooserId, `shot:${shot.seq}`);
         }
         if (window.innerWidth > 960) triggerShotFlash();
-        if (shot.eliminated) {
+        if (shot.eliminated || shot.damageTargetEliminated) {
           setTimeout(() => AudioFX.playEliminated(), 320);
         }
       } else {
@@ -537,6 +558,11 @@
     if (shot.curse) return "MALDICÃO";
     if (shot.source && shot.source !== "RODADA") return shot.source;
     return "";
+  }
+
+  function bonecoPenaltyDetail(shot) {
+    const odds = shot && shot.oddsBefore ? ` Chance efetiva: ${shot.oddsBefore}.` : "";
+    return `O prazo terminou sem transferência e a maldição acabou. O giro de punição tem mínimo 5/6 antes do Espectro.${odds} Este giro não transfere dano.`;
   }
 
   function feedMeta(line) {
@@ -613,9 +639,11 @@
 
   function renderArenaFeed(logs, data, animStep) {
     const sourceLogs = logs || [];
+    const spinInProgress =
+      animStep === "SPIN" || Date.now() < rl.shotResultAt;
     const spinningShot = data
       && data.phase === "ROULETTE_SHOT"
-      && animStep === "SPIN"
+      && spinInProgress
       && data.lastShot;
     const spinningTarget = spinningShot
       && (data.players || []).find((player) => player.id === data.lastShot.shooterId);
@@ -725,9 +753,38 @@
       el.shotOverlayTitle.textContent = sourceLabel
         ? `${sourceLabel}! ${target.nick} VAI GIRAR...`
         : `${target.nick} FOI ESCOLHIDO...`;
-      el.shotOverlayDetail.textContent = shot.curse
-        ? `${shot.chooserNick} lançou a Maldição. O tambor tem no mínimo 4/6.`
-        : `${shot.chooserNick} escolheu ${target.nick}. A câmara está girando...`;
+      if (shot.bonecoPenalty) {
+        el.shotOverlayDetail.textContent = bonecoPenaltyDetail(shot);
+      } else {
+        el.shotOverlayDetail.textContent = shot.curse
+          ? `${shot.chooserNick} lançou a Maldição. O tambor tem no mínimo 4/6.`
+          : `${shot.chooserNick} escolheu ${target.nick}. A câmara está girando...`;
+      }
+    } else if (shot.bonecoPenalty) {
+      el.shotOverlayTitle.textContent = shot.fired
+        ? shot.eliminated
+          ? "PUNIÇÃO DO BONECO! REAPER FOI ELIMINADO!"
+          : "PUNIÇÃO DO BONECO! BANG NO REAPER!"
+        : "PUNIÇÃO DO BONECO! CLIQUE — REAPER SOBREVIVEU!";
+      el.shotOverlayDetail.textContent = shot.fired
+        ? `A punição não transfere dano. O Reaper perdeu ${shot.damage} vida(s); restam ${shot.livesLeft}. Chance: ${shot.oddsBefore}.`
+        : `${bonecoPenaltyDetail(shot)} Próxima chance: ${shot.oddsAfter}.`;
+    } else if (shot.damageRedirected) {
+      const victim = (data.players || []).find((p) => p.id === shot.damageTargetId);
+      const victimName = shot.damageTargetNick || (victim && victim.nick) || "o amaldiçoado";
+      if (shot.guardAbsorbed) {
+        el.shotOverlayTitle.textContent = `BONECO VUDÚ! O GUARDA-COSTAS SALVOU ${victimName}!`;
+        el.shotOverlayDetail.textContent =
+          `O tiro contra ${target.nick} transferiu ${shot.damage} dano(s) para ${victimName}, mas o capanga absorveu o disparo.`;
+      } else if (shot.damageTargetEliminated) {
+        el.shotOverlayTitle.textContent = `BANG! ${victimName} FOI ELIMINADO!`;
+        el.shotOverlayDetail.textContent =
+          `O Boneco Vudú transferiu ${shot.damage} dano(s) do tiro contra ${target.nick} (${shot.oddsBefore}) para ${victimName}.`;
+      } else {
+        el.shotOverlayTitle.textContent = `BONECO VUDÚ! TIRO TRANSFERIDO PARA ${victimName}!`;
+        el.shotOverlayDetail.textContent =
+          `${victimName} perdeu ${shot.damage} vida(s) pelo disparo que atingiu ${target.nick} (${shot.oddsBefore}); restam ${shot.damageTargetLivesLeft} vida(s).`;
+      }
     } else if (shot.guardAbsorbed) {
       el.shotOverlayTitle.textContent = `GUARDA-COSTAS! ${target.nick} NÃO MORREU!`;
       el.shotOverlayDetail.textContent =
@@ -776,7 +833,7 @@
       el.shotOverlayCharacter.src = tombstoneImage(target.skin);
     } else if (shot.fired) {
       el.shotOverlayCharacter.src = Date.now() < rl.shotResultAt + SHOT_REACTION_MS
-        ? characterGif(target.skin, "shot")
+        ? characterGif(target.skin, shot.damageRedirected ? "happy" : "shot")
         : characterGif(target.skin, "idle");
     } else {
       el.shotOverlayCharacter.src = Date.now() < rl.shotResultAt + SHOT_REACTION_MS
@@ -789,13 +846,19 @@
     }
   }
 
-  function startShotAnimationIfNeeded(data) {
+  function startShotAnimationIfNeeded(data, previousState) {
     if (!data || data.phase !== "ROULETTE_SHOT" || !data.lastShot) return false;
     const seq = Number(data.lastShot.seq || 0);
     if (!seq || rl.activeShotSeq === seq) return false;
 
     rl.activeShotSeq = seq;
     rl.lastShotSeq = Math.max(rl.lastShotSeq, seq);
+    // Só guarda o estado imediatamente anterior ao disparo. Se o poll anterior
+    // já era este mesmo giro, não serve como referência.
+    const prevSeq = previousState && previousState.lastShot
+      ? Number(previousState.lastShot.seq || 0)
+      : 0;
+    rl.preShotState = prevSeq === seq ? null : (previousState || null);
     rl.lastState = data;
     playShotAnimationSequence(data.lastShot);
     return true;
@@ -820,7 +883,11 @@
     if (rl.abilityFxTimer) clearTimeout(rl.abilityFxTimer);
     rl.abilityFxTimer = window.setTimeout(() => {
       rl.abilityFx = null;
-      if (rl.lastState) renderArena(rl.lastState, "IDLE");
+      if (rl.lastState) {
+        // Não deixa um FX antigo forçar um render IDLE no meio do giro.
+        const step = Date.now() < rl.shotAnimUntil ? rl.shotStageStep : "IDLE";
+        renderArena(rl.lastState, step);
+      }
     }, duration);
     return true;
   }
@@ -833,6 +900,7 @@
       rl.activeShotSeq = 0;
       rl.lastShotSeq = 0;
       rl.shotStageStep = "IDLE";
+      rl.preShotState = null;
       rl.lastAbilitySeq = 0;
       rl.abilityFx = null;
       rl.toast = null;
@@ -851,10 +919,11 @@
       el.winnerPanel.classList.add("hidden");
       el.arenaScreen.classList.remove("duel-spin-focus", "shot-stage-active");
     }
+    const previousState = rl.lastState;
     rl.lastState = data;
 
     registerAbilityFx(data);
-    const justStartedShot = startShotAnimationIfNeeded(data);
+    const justStartedShot = startShotAnimationIfNeeded(data, previousState);
 
     const me = (data.players || []).find((p) => p.id === rl.clientId);
 
@@ -870,6 +939,7 @@
     if (el.arenaScreen.classList.contains("hidden") && rl.active) {
       el.lobbyScreen.classList.add("hidden");
       el.arenaScreen.classList.remove("hidden");
+      closeBotPicker();
     }
 
     const shotStillAnimating =
@@ -891,6 +961,85 @@
     }
   }
 
+  // ------------------------------------------------------------ bots (lobby)
+  function openBotPicker() {
+    if (!el.botModal) return;
+    const data = rl.lastState || {};
+    const roster = data.players || [];
+    const taken = {};
+    roster.forEach((p) => {
+      if (p && p.skin) taken[p.skin] = p;
+    });
+
+    el.botModalOptions.innerHTML = "";
+    SKIN_ORDER.forEach((skin) => {
+      const owner = taken[skin];
+      const kit = kitFor(data, skin) || FALLBACK_KITS[skin] || {};
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "pixel-btn bot-option "
+        + (owner ? "btn-slate" : "btn-gold");
+      option.disabled = !!owner;
+      option.innerHTML = `
+        <img src="assets/portrait_${skin}.png" alt="" class="pixel-img bot-option-portrait" />
+        <span class="bot-option-info">
+          <span class="ability-option-label">${SKIN_LABELS[skin] || skin}</span>
+          <span class="ability-option-sub">${escapeHtml(kit.role || "")}</span>
+        </span>
+        <span class="bot-option-status">${owner ? `JÁ ESCOLHIDO · ${escapeHtml(owner.nick)}` : "ADICIONAR"}</span>
+      `;
+      option.addEventListener("click", () => {
+        AudioFX.playClick();
+        addBotFromPicker(skin);
+      });
+      el.botModalOptions.appendChild(option);
+    });
+
+    el.botModal.classList.remove("hidden");
+  }
+
+  function closeBotPicker() {
+    if (!el.botModal) return;
+    el.botModal.classList.add("hidden");
+  }
+
+  function notifyLobby(message) {
+    if (!message) return;
+    if (rl.lastState && rl.lastState.phase === "LOBBY") {
+      showLobbyNotice(message);
+    } else {
+      showToast(message);
+    }
+  }
+
+  async function addBotFromPicker(skin) {
+    try {
+      const data = await apiPost("/api/roulette/bot", { skin });
+      if (data && data.phase) applyServerState(data);
+      if (data && data.ok) {
+        closeBotPicker();
+        notifyLobby(data.message || "Bot adicionado.");
+      } else {
+        notifyLobby((data && data.message) || "Não foi possível adicionar o bot.");
+        openBotPicker();
+      }
+    } catch (_) {
+      notifyLobby("Falha ao adicionar o bot.");
+    }
+  }
+
+  async function removeBotById(botId) {
+    if (!botId) return;
+    try {
+      const data = await apiPost("/api/roulette/bot", { removeBot: botId });
+      if (data && data.phase) applyServerState(data);
+      notifyLobby((data && data.message) || "Bot removido.");
+      if (el.botModal && !el.botModal.classList.contains("hidden")) openBotPicker();
+    } catch (_) {
+      notifyLobby("Falha ao remover o bot.");
+    }
+  }
+
   function renderLobby(data) {
     updateSkinSelectionUI(data.players);
     el.myDevice.textContent = `${data.viewerIp} • ${data.viewerPlatform}`;
@@ -901,18 +1050,36 @@
       el.lobbyPlayers.innerHTML = `<div class="roster-row"><span class="roster-ip">Nenhum jogador entrou ainda. Digite seu nick e clique em Entrar!</span></div>`;
     } else {
       data.players.forEach((p) => {
+        const isMe = p.id === rl.clientId;
         const row = document.createElement("div");
-        row.className = "roster-row" + (p.id === rl.clientId ? " me" : "");
+        row.className = "roster-row"
+          + (isMe ? " me" : "")
+          + (p.isBot ? " bot" : "");
+        const place = p.isBot ? "BOT • CPU" : `${p.ip} • ${p.platform}`;
+        const tagText = p.isBot
+          ? ((FALLBACK_KITS[p.skin] || {}).role || SKIN_LABELS[p.skin] || p.skin)
+          : (SKIN_LABELS[p.skin] || p.skin);
         row.innerHTML = `
           <div class="roster-left">
             <img src="${characterGif(p.skin, "idle")}" alt="${p.skin}" class="pixel-img" />
             <div>
-              <div class="roster-nick">${escapeHtml(p.nick)}${p.id === rl.clientId ? " (VOCÊ)" : ""}</div>
-              <div class="roster-ip">${escapeHtml(p.ip)} • ${escapeHtml(p.platform)}</div>
+              <div class="roster-nick">${escapeHtml(p.nick)}${isMe ? " (VOCÊ)" : ""}${p.isBot ? ' <span class="bot-badge">BOT</span>' : ""}</div>
+              <div class="roster-ip">${escapeHtml(place)}</div>
             </div>
           </div>
-          <span class="roster-tag">${SKIN_LABELS[p.skin] || p.skin}</span>
+          <div class="roster-right">
+            <span class="roster-tag">${escapeHtml(tagText)}</span>
+            ${p.isBot ? `<button type="button" class="pixel-btn btn-red btn-sm roster-remove" data-bot-id="${escapeHtml(p.id)}" title="Remover ${escapeHtml(p.nick)} da mesa">REMOVER</button>` : ""}
+          </div>
         `;
+        const removeBtn = row.querySelector(".roster-remove");
+        if (removeBtn) {
+          removeBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            AudioFX.playClick();
+            removeBotById(p.id);
+          });
+        }
         el.lobbyPlayers.appendChild(row);
       });
     }
@@ -936,8 +1103,25 @@
     const shot = data.phase === "ROULETTE_SHOT" && data.lastShot && data.lastShot.shooterId === p.id
       ? data.lastShot
       : null;
+    const redirectedShot = data.phase === "ROULETTE_SHOT"
+      && data.lastShot
+      && data.lastShot.damageRedirected
+      && data.lastShot.damageTargetId === p.id
+      ? data.lastShot
+      : null;
     if (rl.happySeatId === p.id && Date.now() < rl.happySeatUntil) {
       return characterGif(p.skin, "happy");
+    }
+    if (redirectedShot && animStep === "SPIN") return characterGif(p.skin, "idle");
+    if (redirectedShot && animStep === "RESULT") {
+      if (redirectedShot.guardAbsorbed) {
+        return p.alive ? characterGif(p.skin, "happy") : tombstoneImage(p.skin);
+      }
+      if (redirectedShot.fired && Date.now() < rl.shotResultAt + SHOT_REACTION_MS) {
+        return characterGif(p.skin, "shot");
+      }
+      if (!p.alive) return tombstoneImage(p.skin);
+      return characterGif(p.skin, "idle");
     }
     if (shot && animStep === "RESULT") {
       if (shot.guardAbsorbed) {
@@ -945,6 +1129,9 @@
       }
       if (shot.fired && shot.eliminated && Date.now() >= rl.shotResultAt + SHOT_REACTION_MS) {
         return tombstoneImage(p.skin);
+      }
+      if (shot.damageRedirected && shot.fired && Date.now() < rl.shotResultAt + SHOT_REACTION_MS) {
+        return characterGif(p.skin, "happy");
       }
       return characterGif(p.skin, "idle");
     }
@@ -1199,7 +1386,7 @@
   }
 
   function openBillyModal(data) {
-    const options = (data.players || []).filter((p) => p.alive).map((p) => ({
+    const options = aliveOpponents(data).map((p) => ({
       label: `${p.nick}`,
       sub: `${SKIN_LABELS[p.skin] || p.skin} • ${p.lives} vida(s) • tambor ${p.odds}`,
       className: "btn-slate",
@@ -1292,15 +1479,15 @@
     } else if (data.prepStage === 3 && data.targetId === rl.clientId) {
       options.push({
         label: "BONECO VUDÚ",
-        sub: "Outro jogador gira junto com você (mín. 4/6)",
+        sub: "Paga 1 vida + 1 ficha; transfere o dano ou força punição",
         className: "btn-orange",
-        onClick: () => openReaperTargetModal(data, "boneco", "BONECO VUDÚ", "Escolha quem vai girar junto com você, com no mínimo 4/6."),
+        onClick: () => openReaperTargetModal(data, "boneco", "BONECO VUDÚ", "Escolha um jogador vivo para amaldiçoar. O prazo inclui esta rodada e as quatro seguintes. Se um disparo atingir você, todo o dano passa para o amaldiçoado e o efeito termina. Sem transferência até o fim da quinta rodada, a maldição acaba antes de você girar com no mínimo 5/6; com 1 vida, o Espectro limita o giro a 2/6. A punição não transfere dano."),
       });
     }
 
     openAbilityModal(
       "SANGUE POR SANGUE",
-      `Pague 1 vida (você tem ${mePlayer ? mePlayer.lives : "?"}) e escolha o efeito desta etapa.`,
+      `Pague 1 vida e 1 ficha (você tem ${mePlayer ? mePlayer.lives : "?"} vida(s)) e escolha o efeito desta etapa.`,
       options
     );
   }
@@ -1371,6 +1558,66 @@
     return true;
   }
 
+  // Durante o giro, o servidor já sabe o resultado, mas o assento não pode
+  // entregá-lo antes de a câmara parar. Usa a vida/tambor de antes do disparo.
+  function stagedShotPlayer(p, data, animStep) {
+    const shot = data.lastShot;
+    const shotSpinning =
+      animStep === "SPIN" || Date.now() < rl.shotResultAt;
+    if (
+      !shot ||
+      data.phase !== "ROULETTE_SHOT" ||
+      !shotSpinning ||
+      (p.id !== shot.shooterId && !(shot.damageRedirected && p.id === shot.damageTargetId))
+    ) {
+      return p;
+    }
+
+    const prev = ((rl.preShotState && rl.preShotState.players) || [])
+      .find((x) => x.id === p.id);
+    if (shot.damageRedirected && p.id === shot.damageTargetId) {
+      return prev ? { ...p, ...prev } : {
+        ...p,
+        lives: Number(shot.damageTargetLivesBefore) || p.lives,
+        alive: true,
+      };
+    }
+    const bulletsBefore = Number(shot.bulletCountBefore);
+
+    let livesBefore = Number(shot.livesBefore);
+    if (!Number.isFinite(livesBefore) || livesBefore <= 0) {
+      if (prev && Number.isFinite(Number(prev.lives))) {
+        livesBefore = Number(prev.lives);
+      } else if (!shot.fired) {
+        livesBefore = Number(shot.livesLeft);
+      } else if (shot.guardAbsorbed) {
+        livesBefore = Math.max(1, Number(shot.damage) || 1, Number(shot.livesLeft) || 1);
+      } else {
+        livesBefore = (Number(shot.livesLeft) || 0) + (Number(shot.damage) || 1);
+      }
+    }
+    if (!Number.isFinite(livesBefore) || livesBefore <= 0) {
+      livesBefore = Number(p.lives) || 1;
+    }
+
+    return {
+      ...p,
+      lives: livesBefore,
+      alive: true,
+      bullets: Number.isFinite(bulletsBefore)
+        ? Math.max(1, Math.min(6, bulletsBefore))
+        : (prev ? prev.bullets : p.bullets),
+      odds: shot.oddsBefore || (prev ? prev.odds : p.odds),
+      // Efeitos consumidos no início do giro continuam visíveis até o fim.
+      guard: prev ? prev.guard : p.guard,
+      ficha: prev ? prev.ficha : p.ficha,
+      marcado: prev ? prev.marcado : p.marcado,
+      selo: prev ? prev.selo : p.selo,
+      setes: prev ? prev.setes : p.setes,
+      marks: prev ? prev.marks : p.marks,
+    };
+  }
+
   // ------------------------------------------------------------------ arena
   function renderArena(data, animStep) {
     if (!data) return;
@@ -1381,7 +1628,8 @@
     const alivePlayers = data.players.filter((p) => p.alive);
     const me = data.players.find((p) => p.id === rl.clientId);
     const aliveBeforeSpin = alivePlayers.length
-      + (animStep === "SPIN" && data.lastShot && data.lastShot.eliminated ? 1 : 0);
+      + (animStep === "SPIN" && data.lastShot
+        && (data.lastShot.damageTargetEliminated || data.lastShot.eliminated) ? 1 : 0);
     const focusDuelSpin = window.innerWidth > 960
       && data.phase === "ROULETTE_SHOT"
       && animStep === "SPIN"
@@ -1393,7 +1641,7 @@
     el.arenaScreen.classList.toggle("shot-stage-active", shotStageActive);
 
     el.roundNum.textContent = `${data.roundNum}`;
-    el.aliveCount.textContent = `${alivePlayers.length}/${data.players.length}`;
+    el.aliveCount.textContent = `${aliveBeforeSpin}/${data.players.length}`;
     el.timer.textContent = (data.phase === "PLAYING_CARDS" || data.phase === "PREP")
       ? `${data.timeLeft}s`
       : "-";
@@ -1463,9 +1711,34 @@
         el.phaseBanner.textContent = sourceLabel
           ? `${sourceLabel}! ${sh.shooterNick} VAI GIRAR...`
           : `${sh.shooterNick} APONTANDO PARA SI MESMO...`;
-        el.shotDetail.textContent = sh.curse
-          ? `${sh.chooserNick} lançou a Maldição (mínimo 4/6).`
-          : `${sh.chooserNick} escolheu ${sh.shooterNick} (Chance: ${sh.oddsBefore})`;
+        el.shotDetail.textContent = sh.bonecoPenalty
+          ? bonecoPenaltyDetail(sh)
+          : sh.curse
+            ? `${sh.chooserNick} lançou a Maldição (mínimo 4/6).`
+            : `${sh.chooserNick} escolheu ${sh.shooterNick} (Chance: ${sh.oddsBefore})`;
+      } else if (sh.bonecoPenalty) {
+        el.phaseBanner.className = sh.fired ? "status-banner lose" : "status-banner push";
+        el.phaseBanner.textContent = sh.fired
+          ? sh.eliminated
+            ? "PUNIÇÃO DO BONECO! REAPER FOI ELIMINADO!"
+            : "PUNIÇÃO DO BONECO! BANG NO REAPER!"
+          : "PUNIÇÃO DO BONECO! CLIQUE — REAPER SOBREVIVEU!";
+        el.shotDetail.textContent = sh.fired
+          ? `O giro de punição não transfere dano. Restam ${sh.livesLeft} vida(s); chance: ${sh.oddsBefore}.`
+          : `${bonecoPenaltyDetail(sh)} Próxima chance: ${sh.oddsAfter}.`;
+      } else if (sh.damageRedirected) {
+        const victimName = sh.damageTargetNick || "o amaldiçoado";
+        el.phaseBanner.className = sh.guardAbsorbed ? "status-banner win" : "status-banner lose";
+        if (sh.guardAbsorbed) {
+          el.phaseBanner.textContent = `BONECO VUDÚ! O CAPANGA SALVOU ${victimName}!`;
+          el.shotDetail.textContent = `O tiro contra ${sh.shooterNick} transferiu ${sh.damage} dano(s) para ${victimName}, mas o Guarda-Costas absorveu o disparo.`;
+        } else if (sh.damageTargetEliminated) {
+          el.phaseBanner.textContent = `BANG! ${victimName} FOI ELIMINADO!`;
+          el.shotDetail.textContent = `O Boneco Vudú transferiu ${sh.damage} dano(s) do tiro que atingiu ${sh.shooterNick} (${sh.oddsBefore}).`;
+        } else {
+          el.phaseBanner.textContent = `BONECO VUDÚ! TIRO TRANSFERIDO PARA ${victimName}!`;
+          el.shotDetail.textContent = `${victimName} perdeu ${sh.damage} vida(s); restam ${sh.damageTargetLivesLeft}. ${sh.shooterNick} não perdeu vida.`;
+        }
       } else if (sh.guardAbsorbed) {
         el.phaseBanner.className = "status-banner win";
         el.phaseBanner.textContent = `GUARDA-COSTAS! ${sh.shooterNick} SOBREVIVEU!`;
@@ -1508,12 +1781,28 @@
     }
 
     // Painel de habilidade permanente
-    if (me) renderAbilityPanel(data, data.me || me);
+    if (me) {
+      let panelMe = data.me || me;
+      if (
+        panelMe
+        && animStep === "SPIN"
+        && data.phase === "ROULETTE_SHOT"
+        && data.lastShot
+        && data.lastShot.shooterId === panelMe.id
+        && rl.preShotState
+        && rl.preShotState.me
+      ) {
+        // O Guarda-Costas do Don não pode "desarmar" na tela antes do BANG.
+        panelMe = { ...panelMe, guard: rl.preShotState.me.guard };
+      }
+      renderAbilityPanel(data, panelMe);
+    }
 
     // Assentos
     const fx = rl.abilityFx && Date.now() < rl.abilityFx.until ? rl.abilityFx : null;
     el.seatsGrid.innerHTML = "";
-    data.players.forEach((p) => {
+    data.players.forEach((rawPlayer) => {
+      const p = stagedShotPlayer(rawPlayer, data, animStep);
       const card = document.createElement("div");
       const isMe = p.id === rl.clientId;
       const isShooter = data.phase === "CHOOSE_TARGET" && p.id === data.currentShooterId;
@@ -1527,9 +1816,9 @@
       const isDeathAnimationPending =
         data.phase === "ROULETTE_SHOT" &&
         data.lastShot &&
-        data.lastShot.shooterId === p.id &&
+        (data.lastShot.shooterId === p.id || (data.lastShot.damageRedirected && data.lastShot.damageTargetId === p.id)) &&
         data.lastShot.fired &&
-        data.lastShot.eliminated &&
+        (data.lastShot.eliminated || data.lastShot.damageTargetEliminated) &&
         animStep === "RESULT" &&
         Date.now() < rl.shotResultAt + SHOT_REACTION_MS;
       const seatLeavingClass = isStagedTarget ? " shot-leaving" : "";
@@ -1538,7 +1827,9 @@
         animStep === "RESULT" &&
         data.lastShot &&
         data.lastShot.fired &&
-        data.lastShot.targetId === p.id;
+        (data.lastShot.damageRedirected
+          ? data.lastShot.damageTargetId === p.id
+          : data.lastShot.targetId === p.id);
 
       card.className =
         "seat-card" +
@@ -1628,6 +1919,13 @@
       if (p.marcado) {
         chips.push({ icon: "icon_status_marcado", label: "MARCADO" });
       }
+      if (p.bonecoMarked) {
+        chips.push({
+          icon: "abil_phantom_ativa",
+          label: `AMALDIÇOADO ${p.bonecoRounds}/5`,
+          className: "cursed",
+        });
+      }
       if (p.skin === "outlaw") {
         chips.push({ icon: "icon_marca", label: `MARCA ${p.marks}/3` });
       } else if (p.skin === "phantom") {
@@ -1642,7 +1940,7 @@
       }
       const chipsHtml = chips.length
         ? `<div class="seat-chips">${chips.map((c) => `
-            <span class="seat-chip${c.label === "GUARDA-COSTAS ARMADO" ? " guard" : ""}">
+            <span class="seat-chip${c.label === "GUARDA-COSTAS ARMADO" ? " guard" : ""}${c.className ? ` ${c.className}` : ""}">
               <img src="assets/ui/${c.icon}.png" class="pixel-img" alt="" />${c.label}
             </span>`).join("")}</div>`
         : "";
@@ -1812,11 +2110,9 @@
       if (e.key === "Enter") joinOrUpdate();
     });
 
-    el.btnAddBot.addEventListener("click", async () => {
+    el.btnAddBot.addEventListener("click", () => {
       AudioFX.playClick();
-      try {
-        applyServerState(await apiPost("/api/roulette/bot", {}));
-      } catch (_) {}
+      openBotPicker();
     });
 
     el.btnClearBots.addEventListener("click", async () => {
@@ -1898,6 +2194,16 @@
     el.abilityModal.addEventListener("click", (e) => {
       if (e.target === el.abilityModal) closeAbilityModal();
     });
+
+    if (el.botModal) {
+      el.botModalCancel.addEventListener("click", () => {
+        AudioFX.playClick();
+        closeBotPicker();
+      });
+      el.botModal.addEventListener("click", (e) => {
+        if (e.target === el.botModal) closeBotPicker();
+      });
+    }
 
     el.btnReady.addEventListener("click", async () => {
       AudioFX.playClick();
