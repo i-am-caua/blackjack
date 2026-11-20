@@ -68,25 +68,29 @@ uma mexe apenas no próprio estado):
 
 - Cada vencedor escolhe um jogador **vivo**, **exceto a si mesmo**.
 
-#### Fase 5 — Janela de preparação (antes de rolar)
+#### Fase 5 — Preparação e habilidades
 
-Fase curta de ~8 segundos entre a escolha do alvo e o sorteio da câmara. É a única
-janela em que as ativas podem ser usadas. Ordem:
+As habilidades ativas podem ser acionadas durante uma partida, antes de a
+roleta começar a girar. Efeitos que precisam de uma roleta ficam guardados para
+o próximo momento seguro:
 
-1. **Reaper** — paga 1 vida e 1 ficha para escolher **Maldição** ou **Selo de
-   Chumbo**.
-2. **Billy** — gasta a ficha e marca um alvo.
-3. **Viper** — se for ela a girar, o botão `ROLETA DE CABEÇAS` aparece; ela decide.
-4. **Reaper** — se for ele a girar, pode pagar 1 vida e 1 ficha para usar
-   **Boneco Vudú** em outro jogador vivo.
-5. A janela fecha (todos confirmaram ou o tempo acabou) e o disparo é rolado.
+- **Billy — Munição Turbinada:** marca o alvo na hora; vale no próximo giro dele.
+- **Viper — Roleta de Cabeças:** fica guardada até a Viper ser escolhida para um
+  giro normal; o sorteio e o giro extra acontecem depois do giro dela.
+- **Zero — Curto-Circuito:** continua limitado à fase de cartas, quando a troca
+  ainda pode alterar as mãos antes de decidir os vencedores. Pode ser usado
+  durante a jogada de qualquer pessoa.
+- **Reaper — Selo de Chumbo:** aplica-se na hora e afeta os próximos giros.
+- **Reaper — Maldição:** usada durante a preparação resolve na hora; se usada
+  antes, fica guardada até a próxima preparação.
+- **Reaper — Boneco Vudú:** ativa na hora se o Reaper já for girar; se usado
+  antes, fica armado para o próximo giro do Reaper. O prazo começa quando ativa.
 
-**Regras da janela:**
-
-- Quem não confirmar não gasta nada.
-- A **Maldição** resolve **na hora**, como um tiro extra fora do turno (ver
-  Fase 6.5).
-- O disparo da rodada só é rolado depois que a janela fecha.
+A preparação de aproximadamente 8 segundos continua antes do disparo normal.
+Ela permite confirmar que todos estão prontos; as habilidades já não dependem
+dessa janela. Nenhuma ativa pode mudar o resultado depois que o tambor começa a
+girar. A **Maldição** usada na preparação interrompe a sequência para resolver
+um giro extra e depois retoma a preparação.
 
 #### Fase 6 — Cálculo do tambor
 
@@ -106,7 +110,8 @@ A Maldição é a única ativa que **interrompe a rodada**:
 
 1. O alvo gira naquele instante, com o tambor calculado pela Fase 6.
 2. Passa pela Fase 7 (disparo) e pela Fase 8 (gatilhos) normalmente.
-3. Depois do giro, o tambor do alvo **volta para `1/6`**, dando clique ou não.
+3. Depois do giro, a base do tambor do alvo **volta para `1/6`**, dando clique
+   ou não; se ele estiver selado, o próximo giro começa efetivamente em `2/6`.
 4. A rodada continua de onde parou.
 
 #### Fase 7 — Disparo
@@ -115,13 +120,14 @@ A Maldição é a única ativa que **interrompe a rodada**:
 2. Bala → dano **1**, ou **2** se o alvo estiver com **Munição Turbinada**.
 3. Dano **maior ou igual** às vidas restantes → **Guarda-Costas** intercepta.
 4. Aplica a perda de vida e a eliminação.
-5. Reset do tambor: `1/6` normal; `3/6` quando o Guarda-Costas absorveu.
+5. Reset do tambor: `1/6` normal; base `3/6` quando o Guarda-Costas absorve.
+   Se o alvo tiver Selo, o próximo giro ainda recebe `+1` antes do sorteio.
 
 #### Fase 8 — Gatilhos pós-disparo
 
 | Gatilho | Condição |
 |---|---|
-| **Sangue Frio** (Viper) | o giro começou em 4/6 ou 5/6 e ela sobreviveu de verdade |
+| **Sangue Frio** (Viper) | clique sem perder vida em giro iniciado em 3/6, 4/6 ou 5/6 |
 | **Sede de Sangue** (Reaper) | +1 marca por **BANG**, em qualquer jogador |
 | **Munição Turbinada** (Billy) | marca consumida no giro do alvo, **mesmo em clique** |
 | **Guarda-Costas** (Don) | consumido ao absorver |
@@ -144,7 +150,7 @@ transfere dano. O Espectro continua sendo aplicado por último.
 
 | Situação | Resultado |
 |---|---|
-| **Munição Turbinada + Guarda-Costas** | dano 2 é fatal → capanga morre, Don fica com 1 vida, tambor `3/6` |
+| **Munição Turbinada + Guarda-Costas** | dano 2 é fatal → capanga morre, Don fica com 1 vida, base do tambor `3/6` (mais `+1` no próximo giro se estiver selado) |
 | **Roleta de Cabeças + Guarda-Costas** | se o sorteio cair no Don e o tiro for fatal, o capanga absorve |
 | **Maldição + Guarda-Costas** | o giro forçado é normal; se for fatal, o capanga absorve |
 | **Boneco Vudú + Munição Turbinada** | se o disparo atingir o Reaper, os 2 danos são transferidos; o amaldiçoado pode ser eliminado com 2 vidas |
@@ -227,8 +233,8 @@ A sequência reinicia quando ele:
 
 ### Ativa — Munição Turbinada
 
-Billy pode gastar a ficha **quando quiser** e escolher **outro** jogador vivo
-(ele não pode marcar a si mesmo).
+Billy pode gastar a ficha em qualquer fase da partida antes de a roleta começar
+a girar e escolher **outro** jogador vivo (ele não pode marcar a si mesmo).
 
 Na próxima roletada desse jogador:
 
@@ -275,7 +281,7 @@ aguentam. Quanto mais perto da morte a mesa chega, mais calma ela fica.
 | Tipo | Habilidade | Efeito resumido |
 |---|---|---|
 | Passiva | **Pulso Firme** | 75% de não subir a bala no `1/6` (1× por vida) |
-| Carga | **Sangue Frio** | Sobreviver a um giro iniciado em 4/6 ou 5/6 gera 1 ficha |
+| Carga | **Sangue Frio** | Clique sem perder vida em giro iniciado em 3/6, 4/6 ou 5/6 gera 1 ficha |
 | Ativa | **Roleta de Cabeças** | Sorteia um jogador vivo, que ganha +1 bala e roleta |
 
 ### Passiva — Pulso Firme
@@ -298,15 +304,15 @@ por vida (+36%), virando a mais tanque da mesa. Com 75% fica em **3,18 tiros
 (+14,5%)** — uma vantagem sentida, mas do tamanho de uma passiva.
 
 **Antissinergia registrada:** segurar o tambor em `1/6` atrasa a carga dela, que
-exige sobreviver a um giro iniciado em `4/6` ou `5/6`. É aceitável — ela
-sobrevive mais, então uma hora chega lá.
+exige dar clique sem perder vida em um giro iniciado em `3/6`, `4/6` ou `5/6`. A faixa maior
+permite que a carga aconteça antes sem remover a tensão dos giros mais altos.
 
 ### Carga — Sangue Frio
 
 Viper ganha 1 ficha de Roleta de Cabeças quando:
 
 - for escolhida para atirar em si mesma;
-- **sobreviver** a uma roletada que começou em **4/6 ou 5/6**.
+- o giro começa em **3/6, 4/6 ou 5/6** e dá **clique**, sem ela perder vida.
 
 Considera-se a chance **antes do disparo**.
 
@@ -314,35 +320,36 @@ Considera-se a chance **antes do disparo**.
 
 - Só pode ser conquistada **uma vez por partida**.
 - Não exige estar com 1 vida.
-- `3/6` ou menos **não** concede a ficha.
+- `2/6` ou menos **não** concede a ficha.
 - `6/6` não tem como sobreviver, então não concede.
-- Não vale se outro efeito impedir o dano — ela precisa sobreviver ao disparo
-  de verdade.
+- **BANG nunca concede a ficha**, mesmo se o dano não for fatal e ela continuar viva.
 
 **Exemplo:**
 
 ```text
-Viper em 4/6 → clique → sobrevive → ganha a ficha
-O tambor passa normalmente para 5/6
+Viper em 3/6 → clique → sobrevive → ganha a ficha
+O tambor passa normalmente para 4/6
+
+Viper em 4/6 → BANG não fatal → não ganha ficha
 ```
 
 ### Ativa — Roleta de Cabeças
 
-A ativação é **manual**. Quando é escolhida para girar, abre a janela de
-preparação e o botão `ROLETA DE CABEÇAS` aparece no painel dela.
+A ativação é **manual** e pode ser feita em qualquer fase antes de o tambor
+começar a girar. A ficha é gasta na ativação e o efeito fica guardado até a
+Viper ser escolhida para um giro normal.
 
-1. Ela clica e gasta a ficha.
-2. O sistema sorteia aleatoriamente um jogador vivo.
-3. O sorteado **pode ser a própria Viper**.
-4. O sorteado recebe **+1 munição**.
-5. O giro da Viper resolve primeiro; o do sorteado **depois**.
-6. O sorteado gira mesmo que a Viper morra no próprio giro.
-7. A ficha é consumida **independentemente** do resultado (bala ou clique).
+1. Ela ativa e gasta a ficha; o uso fica guardado.
+2. Na próxima vez que for escolhida para um giro normal, o sistema sorteia um
+   jogador vivo.
+3. O sorteado **pode ser a própria Viper** e recebe **+1 munição**.
+4. O giro da Viper resolve primeiro; o do sorteado **depois**.
+5. O sorteado gira mesmo que a Viper morra no próprio giro.
+6. A ficha é consumida na ativação, independentemente do resultado futuro.
 
 **Limitações:**
 
-- Se ela **não clicar** na janela, o giro dela acontece normalmente e a ficha
-  continua guardada.
+- Se ela **não ativar** a habilidade, a ficha continua guardada.
 - O sorteio inclui a Viper.
 - O alvo sorteado deve ser avisado antes do giro.
 - A munição adicional não passa de `6/6`.
@@ -351,8 +358,8 @@ preparação e o botão `ROLETA DE CABEÇAS` aparece no painel dela.
 **Exemplo:**
 
 ```text
-Viper é escolhida → janela abre → clica no botão
-Sorteio → Don (2/6 → 3/6)
+Viper usa durante a compra de cartas → Roleta fica guardada
+Viper é escolhida para girar → sorteio: Don (2/6 → 3/6)
 Viper gira (1/6) → clique
 Don gira (3/6) → clique
 ```
@@ -523,19 +530,20 @@ Ele fica armado indefinidamente até o primeiro disparo que seria **fatal**.
   (dano maior ou igual às vidas restantes).
 - O capanga morre no lugar dele e o Don fica com **1 vida**, independentemente
   do dano recebido.
-- O tambor do Don vai para **3/6** em vez de resetar em `1/6`.
+- A base do tambor do Don vai para **3/6** em vez de resetar em `1/6`; se ele
+  estiver selado, o próximo giro começa em `4/6`.
 - A ficha é consumida. Máximo uma vez por partida.
 
 **Exemplos:**
 
 ```text
 Don com 1 vida + tiro normal (1 de dano)
-→ seria fatal → capanga morre → Don fica com 1 vida → tambor 3/6
+→ seria fatal → capanga morre → Don fica com 1 vida → base do tambor 3/6
 ```
 
 ```text
 Don com 2 vidas + Munição Turbinada do Billy (2 de dano)
-→ seria fatal → capanga morre → Don fica com 1 vida → tambor 3/6
+→ seria fatal → capanga morre → Don fica com 1 vida → base do tambor 3/6
 ```
 
 ```text
@@ -552,8 +560,9 @@ Don com 3 vidas + tiro normal (1 de dano)
 | Don com 3 vidas | O capanga não entra em ação |
 
 **Por que é equilibrado:** ele só escapa quando já estaria morto, e sai da
-situação com o tambor em `3/6` — ou seja, volta vivo, mas com ~50% de morrer no
-próximo tiro. Não vira tanque, vira segunda chance.
+situação com a base do tambor em `3/6` — ou seja, volta vivo, mas com ~50% de
+morrer no próximo tiro. Se estiver selado, o Selo ainda soma `+1` no giro
+seguinte. Não vira tanque, vira segunda chance.
 
 ---
 
@@ -609,15 +618,18 @@ se a morte não soubesse o que fazer com ele. Os outros jogadores aprenderam que
 
 - Custa **1 vida e 1 ficha** e exige ter **2 ou mais vidas**.
 - Escolhe **um dos três modos** abaixo.
-- Só pode ser usada antes de o tambor começar a girar.
+- Pode ser ativada em qualquer fase antes de o tambor começar a girar. A ficha e
+  a vida são cobradas na ativação; efeitos que exigem uma roleta ficam guardados.
 
 #### Modo 1 — Maldição
 
-O alvo é forçado a girar **na hora**, com no mínimo 4/6.
+Na preparação, o alvo é forçado a girar **na hora**, com no mínimo 4/6. Se usada
+antes da preparação, a Maldição fica guardada e resolve na próxima preparação.
 
-- O giro é **imediato**: acontece no mesmo instante da ativação, como um tiro
-  extra fora do turno, e interrompe a rodada até terminar.
-- Depois desse giro, o tambor volta para `1/6`, dando clique ou não.
+- O giro extra interrompe a sequência da preparação até terminar. Uma Maldição
+  guardada também resolve antes do disparo normal dessa preparação.
+- Depois desse giro, a base do tambor volta para `1/6`, dando clique ou não. Se
+  o alvo estiver selado, o próximo giro efetivo será `2/6`.
 - É um golpe único, sem deixar marca permanente.
 
 ```text
@@ -626,22 +638,29 @@ Alvo em 1/6 → gira em 4/6 → clique → tambor volta para 1/6
 
 #### Modo 2 — Selo de Chumbo
 
-Até o fim da partida, **todo giro do alvo começa com +1 bala**.
+O Selo é aplicado imediatamente. Até o Reaper ser eliminado, **todo giro do
+alvo começa com +1 bala**. Quando o Reaper morre, todos os Selos ativos
+desaparecem.
 
 ```text
 Normal:     1/6 → 2/6 → 3/6 → 4/6 → 5/6 → 6/6
 Selo:       2/6 → 3/6 → 4/6 → 5/6 → 6/6
 ```
 
-- O alvo nunca mais vê `1/6`.
+- O alvo nunca mais gira em `1/6`.
+- O `+1` do Selo entra antes de cada giro. Se o alvo clicar em `2/6`, o próximo
+  giro começa em `3/6`; se levar BANG e o tambor resetar, o próximo começa em
+  `2/6`. O bônus não é contado duas vezes no avanço do clique.
 - Tiros esperados até perder 1 vida: **2,77 → 2,13** (~23% menos).
 
 #### Modo 3 — Boneco Vudú
 
-Quando o Reaper for escolhido para girar, ele pode pagar **1 vida e 1 ficha** e
-amaldiçoar outro jogador vivo. A rodada em que a habilidade é ativada conta como
-a primeira das cinco rodadas do prazo. A ativação não acrescenta munição ao
-tambor do Reaper.
+O Reaper pode pagar **1 vida e 1 ficha** para amaldiçoar outro jogador vivo. Se
+ele já for girar na preparação atual, o Boneco ativa antes desse giro; se não,
+fica guardado até o próximo giro que tenha o Reaper como alvo. O prazo de cinco
+rodadas começa quando o Boneco ativa. A ativação não acrescenta munição ao
+tambor do Reaper. Se o alvo for eliminado antes da ativação guardada, o Boneco
+é cancelado.
 
 Durante o prazo, se um disparo atingir o Reaper, o dano exato daquele disparo é
 transferido para o jogador amaldiçoado. O Reaper não perde vida nesse disparo, e
@@ -751,7 +770,7 @@ Versão reduzida, visível para todos:
 | Personagem | Passiva | Carga | Ativa |
 |---|---|---|---|
 | **Billy** | Mão inicial 16 → −1 bala | 3 estouros seguidos = ficha | Marca um alvo: o próximo tiro dele causa 2 de dano |
-| **Viper** | 75% de não subir a bala no 1/6 (1× por vida) | Sobreviver a um giro em 4/6 ou 5/6 = ficha | Sorteia alguém: +1 bala e roleta |
+| **Viper** | 75% de não subir a bala no 1/6 (1× por vida) | Clique em 3/6, 4/6 ou 5/6 = ficha | Sorteia alguém: +1 bala e roleta |
 | **Zero** | Mão inicial 12–16 revela a próxima carta | 1 ficha a cada 5 rodadas | Troca uma carta com um alvo |
 | **Don** | Com um 7 na mão, empate é vitória sua | 7 na mão inicial = marca (2 = ficha) | Capanga morre no seu lugar, você fica com 1 vida |
 | **Reaper** | Com 1 vida, o tambor nunca passa de 2/6 | 3 BANGs = ficha | Paga 1 vida e 1 ficha: Maldição, Selo de Chumbo ou Boneco Vudú |

@@ -250,14 +250,14 @@
           <p class="char-tagline">“A dona do barco-cassino que transforma o próprio risco em caos para a mesa.”</p>
           <div class="char-skills">
             <div class="char-skill"><img src="assets/ui/abil_duchess_passiva.png" alt="" class="pixel-img" /><div><span class="cs-kind">PASSIVA</span><span class="cs-name">PULSO FIRME</span><em>75% de não subir a bala no 1/6 (1× por vida)</em></div></div>
-            <div class="char-skill"><img src="assets/ui/abil_duchess_carga.png" alt="" class="pixel-img" /><div><span class="cs-kind">CARGA</span><span class="cs-name">SANGUE FRIO</span><em>Sobreviver a um giro em 4/6 ou 5/6 = ficha</em></div></div>
+            <div class="char-skill"><img src="assets/ui/abil_duchess_carga.png" alt="" class="pixel-img" /><div><span class="cs-kind">CARGA</span><span class="cs-name">SANGUE FRIO</span><em>Clique em 3/6, 4/6 ou 5/6 = ficha</em></div></div>
             <div class="char-skill"><img src="assets/ui/abil_duchess_ativa.png" alt="" class="pixel-img" /><div><span class="cs-kind">ATIVA</span><span class="cs-name">ROLETA DE CABEÇAS</span><em>Sorteia alguém: +1 bala e roleta</em></div></div>
           </div>
           <button type="button" class="pixel-btn btn-slate btn-sm char-details-btn">VER DETALHES</button>
           <div class="char-details hidden">
           <p class="char-desc">Dona de um barco-cassino que sobe e desce o rio, a Duquesa aprendeu a contar cartas antes de aprender a ler. Foi traída pelo próprio sócio, enterrada numa cova rasa e voltou — dizem que com a ajuda de um veneno que ninguém deveria ter tomado. Hoje ela não joga para ganhar: joga para descobrir até onde os outros aguentam. Quanto mais perto da morte a mesa chega, mais calma ela fica.</p>
             <div class="char-full"><b>PULSO FIRME</b><span>Uma vez por vida, no primeiro giro que começar exatamente em 1/6, tem 75% de chance de não subir a bala: sucesso mantém 1/6; falha sobe para 2/6. O sorteio e o resultado são públicos. Reseta quando perde uma vida.</span></div>
-            <div class="char-full"><b>SANGUE FRIO</b><span>Uma vez por partida, ganha 1 ficha ao sobreviver de verdade a um giro que começou em 4/6 ou 5/6. Conta a chance antes do disparo; só clique ou BANG não fatal contam.</span></div>
+            <div class="char-full"><b>SANGUE FRIO</b><span>Uma vez por partida, ganha 1 ficha quando dá clique sem perder vida em um giro iniciado em 3/6, 4/6 ou 5/6. Conta a chance antes do disparo. Qualquer BANG não concede a ficha, mesmo que não seja fatal.</span></div>
             <div class="char-full"><b>ROLETA DE CABEÇAS</b><span>Somente quando a Viper for escolhida para girar: na preparação, gasta a ficha e sorteia um jogador vivo, inclusive ela mesma. A Viper gira primeiro; o sorteado recebe +1 bala (máximo 6/6) e gira depois, mesmo que ela morra. A ficha é gasta independentemente do resultado; sem ativação, ela permanece.</span></div>
           </div>
         </div>
@@ -294,7 +294,7 @@
             <p class="char-desc">Barão de terras e dono da linha do telégrafo, o Don é a lei de Raven Hollow — o xerife bebe no balcão dele e o juiz dorme na casa dele. Nunca sujou as mãos, porque sempre existe alguém pago para sujar por ele. Tem uma única superstição: um sete na mão é o sinal de que o destino está do lado dele. Quando o sete aparece, o Don não discute o resultado — ele decide quem ganha.</p>
             <div class="char-full"><b>PALAVRA FINAL</b><span>Enquanto tiver um 7 na mão, qualquer empate que inclua o Don vira vitória só dele; os outros empatados não recebem a vitória. Vale para um 7 inicial ou comprado depois, sem clique nem custo.</span></div>
             <div class="char-full"><b>SETE DA SORTE</b><span>Um 7 na mão inicial dá 1 marca SETES. Ao chegar a 2 marcas, arma automaticamente o Guarda-Costas e ganha sua ficha. Máximo 1 ficha por partida.</span></div>
-            <div class="char-full"><b>GUARDA-COSTAS</b><span>Arma-se automaticamente e fica secreto, visível só ao Don. No primeiro disparo que causaria dano fatal (dano ≥ vidas), o capanga absorve: Don fica com 1 vida, tambor em 3/6 e ficha consumida. Não age em dano não fatal e só pode salvar uma vez na partida.</span></div>
+            <div class="char-full"><b>GUARDA-COSTAS</b><span>Arma-se automaticamente e fica secreto, visível só ao Don. No primeiro disparo que causaria dano fatal (dano ≥ vidas), o capanga absorve: Don fica com 1 vida, base do tambor em 3/6 e ficha consumida. Se Don estiver selado, o próximo giro ainda recebe +1 bala. Não age em dano não fatal e só pode salvar uma vez na partida.</span></div>
           </div>
         </div>
 
@@ -314,15 +314,15 @@
             <div class="char-full"><b>SEDE DE SANGUE</b><span>Cada BANG em qualquer jogador dá 1 marca, inclusive tiro absorvido pelo Guarda-Costas e tiro no próprio Reaper. Com 3 marcas ganha 1 ficha; guarda no máximo 1. A vida limita o uso a duas vezes na partida.</span></div>
             <div class="char-full mode-general">
               <b>SANGUE POR SANGUE · REGRAS GERAIS</b>
-              <span>Use somente na janela de preparação. Cada modo custa 1 ficha e 1 vida; o Reaper precisa ter pelo menos 2 vidas antes de ativar. Maldição e Selo ficam disponíveis na primeira etapa do Reaper. Boneco Vudú só fica disponível quando ele foi escolhido para girar.</span>
+              <span>Use somente na janela de preparação. Cada modo custa 1 ficha e 1 vida; o Reaper precisa ter pelo menos 2 vidas antes de ativar. O modal sempre mostra os três modos. Se o Reaper for escolhido para girar, o Boneco Vudú fica desbloqueado já na primeira etapa. Se ele pular essa etapa, os três modos aparecem novamente na etapa final; o Boneco continua bloqueado se ele não foi escolhido.</span>
             </div>
             <div class="char-full mode-card mode-curse">
               <b>MODO 1 · MALDIÇÃO</b>
-              <span>Escolha outro jogador vivo: ele gira imediatamente com no mínimo 4/6. Depois do giro, o tambor volta a 1/6; se o Guarda-Costas absorver o tiro fatal, fica em 3/6.</span>
+              <span>Escolha outro jogador vivo: ele gira imediatamente com no mínimo 4/6. Depois do giro, a base do tambor volta a 1/6; se o alvo estiver selado, o próximo giro será 2/6. Se o Guarda-Costas absorver o tiro fatal, a base vai para 3/6 (ou 4/6 no próximo giro se estiver selado).</span>
             </div>
             <div class="char-full mode-card mode-seal">
               <b>MODO 2 · SELO DE CHUMBO</b>
-              <span>Escolha outro jogador vivo. Até o fim da partida, cada giro dele começa com +1 bala, sem passar de 6/6.</span>
+              <span>Escolha outro jogador vivo. Cada giro dele começa com +1 bala, sem passar de 6/6, até o Reaper ser eliminado; quando ele morre, todos os Selos se desfazem. Com base em 1/6, gira em 2/6; se clicar, o próximo giro sobe para 3/6. Um BANG reseta a base para 1/6, então o próximo giro volta a 2/6. O jogador selado nunca gira em 1/6.</span>
             </div>
             <div class="char-full mode-card mode-boneco">
               <b>MODO 3 · BONECO VUDÚ</b>

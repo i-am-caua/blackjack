@@ -33,7 +33,7 @@
       name: "Viper",
       role: "Duquesa",
       passive: ["PULSO FIRME", "75% de não subir a bala no 1/6 (1× por vida)"],
-      charge: ["SANGUE FRIO", "Sobreviver a um giro em 4/6 ou 5/6 = ficha"],
+      charge: ["SANGUE FRIO", "Clique em 3/6, 4/6 ou 5/6 = ficha"],
       active: ["ROLETA DE CABEÇAS", "Sorteia alguém: +1 bala e roleta"],
       marksMax: 0,
     },
@@ -67,12 +67,12 @@
     outlaw: {
       passive: "Só a mão inicial de duas cartas que totalize 16 duro ativa. Ás conta como 1; mão macia não ativa. Remove 1 bala, sem descer de 1/6, e não gasta ficha.",
       charge: "Cada estouro no Blackjack dá uma marca. Três estouros seguidos geram 1 ficha, no máximo 1 guardada. A sequência zera ao vencer uma rodada, fazer Blackjack ou usar a ativa.",
-      active: "Na janela de preparação, gasta 1 ficha e marca qualquer jogador vivo. No próximo giro dele, BANG causa 2 de dano; clique também consome a marca. Pode eliminar com 2 vidas. Não acumula, o alvo é avisado e uma marca em alguém que morre antes de girar é perdida.",
+      active: "Antes de o tambor começar a girar, gasta 1 ficha e marca qualquer jogador vivo. A marca fica para o próximo giro dele: BANG causa 2 de dano e clique também a consome. Pode eliminar com 2 vidas. Não acumula; o alvo é avisado.",
     },
     duchess: {
       passive: "Uma vez por vida, o primeiro giro iniciado exatamente em 1/6 tem 75% de chance de manter o tambor em 1/6; se falhar, sobe para 2/6. O sorteio e o resultado são públicos. Reseta quando perde uma vida.",
-      charge: "Uma vez por partida, ganha 1 ficha se sobreviver de verdade a um giro iniciado em 4/6 ou 5/6. Conta a chance antes do disparo; clique ou BANG não fatal contam.",
-      active: "Só quando a Viper for escolhida para girar. Na preparação, gasta 1 ficha e sorteia um jogador vivo, podendo sortear a si mesma. Ela gira primeiro; o sorteado recebe +1 bala (máximo 6/6) e gira depois, mesmo que ela morra. A ficha é consumida mesmo se o sorteado for ela; sem ativar, fica guardada.",
+      charge: "Uma vez por partida, ganha 1 ficha quando dá clique sem perder vida em um giro iniciado em 3/6, 4/6 ou 5/6. A chance considerada é a de antes do disparo. Qualquer BANG não concede a ficha, mesmo que não seja fatal.",
+      active: "Pode gastar a ficha antes de qualquer giro. A ativação fica guardada até a Viper ser escolhida para um giro normal; então sorteia um jogador vivo, que recebe +1 bala (máximo 6/6) e gira depois dela. O sorteio pode incluir a própria Viper.",
     },
     cyber: {
       passive: "Com mão inicial de 12 a 16, reserva a próxima carta e mostra só ao Zero se ela é SEGURA ou PERIGOSA; Ás nunca estoura. Vale para a primeira compra e desaparece após Hit ou Stand.",
@@ -82,17 +82,32 @@
     boss: {
       passive: "Enquanto tiver um 7 na mão, qualquer empate que inclua o Don é vitória só dele; os outros empatados não vencem. Vale para 7 inicial ou comprado, sem clique nem custo.",
       charge: "Um 7 na mão inicial dá 1 marca SETES. Com 2 marcas, arma automaticamente o Guarda-Costas. Máximo 1 ficha por partida.",
-      active: "Arma automaticamente e fica secreto, visível só ao Don. No primeiro tiro fatal (dano ≥ vidas), o capanga absorve: Don fica com 1 vida, tambor em 3/6 e ficha consumida. Não protege contra dano não fatal e só salva uma vez por partida.",
+      active: "Arma automaticamente e fica secreto, visível só ao Don. No primeiro tiro fatal (dano ≥ vidas), o capanga absorve: Don fica com 1 vida, base do tambor em 3/6 e ficha consumida. Se Don estiver selado, o próximo giro ainda recebe +1 bala. Não protege contra dano não fatal e só salva uma vez por partida.",
     },
     phantom: {
       passive: "Com exatamente 1 vida, o tambor final nunca passa de 2/6, mesmo após Selo, mínimo 4/6 ou +1 bala. O tiro acontece normalmente; não é escudo.",
       charge: "Cada BANG em qualquer jogador dá 1 marca, inclusive os absorvidos pelo Guarda-Costas e os que acertam o Reaper. Três marcas geram 1 ficha; guarda no máximo 1. A vida limita o uso a duas vezes por partida.",
-      active: "Só na preparação; cada modo custa 1 vida (é preciso ter 2 ou mais) e 1 ficha. Maldição força outro jogador vivo a girar imediatamente com mínimo 4/6 e depois volta o tambor a 1/6 (Guarda-Costas deixa 3/6). Selo dá +1 bala a cada giro do alvo até o fim da partida, máximo 6/6. Boneco: somente quando o Reaper for escolhido para girar; amaldiçoa outro jogador vivo por cinco rodadas, contando a atual, sem acrescentar munição ao tambor. Se um disparo atingir o Reaper durante o prazo, o dano exato (inclusive os 2 da Munição Turbinada) é transferido e o efeito termina. O Guarda-Costas do Don pode absorver dano fatal transferido. Sem transferência até o fim da quinta rodada, a maldição acaba antes de o Reaper girar com no mínimo 5/6; com 1 vida, o Espectro limita o giro a 2/6. A punição não transfere dano.",
+      active: "Pode ser ativada antes de o tambor girar; cada modo custa 1 vida (é preciso ter 2 ou mais) e 1 ficha. Selo aplica-se na hora e dá +1 bala a cada giro do alvo até o Reaper ser eliminado, máximo 6/6. Maldição usada na preparação força o alvo a girar na hora com mínimo 4/6; se usada antes, fica guardada para a próxima preparação. Boneco ativa se o Reaper já for girar; fora dessa situação, fica guardado para o próximo giro dele. O prazo de cinco rodadas começa quando o Boneco ativa. Se um disparo atingir o Reaper, o dano exato (inclusive os 2 da Munição Turbinada) é transferido e o efeito termina. O Guarda-Costas do Don pode absorver dano fatal transferido. Sem transferência até o fim da quinta rodada, a maldição acaba antes de o Reaper girar com no mínimo 5/6; com 1 vida, o Espectro limita o giro a 2/6. A punição não transfere dano.",
     },
   };
 
   // Reação central acompanha quase toda a pausa do revólver após o giro.
   const SHOT_REACTION_MS = 3600;
+  const SHOT_SPIN_DURATIONS_MS = [2500, 3000, 3500, 4000];
+  const SHOT_SPIN_SPEED_DEG_PER_SEC = 540;
+
+  function shotSpinDurationMs(shot) {
+    const duration = Number(shot && shot.spinDurationMs);
+    return SHOT_SPIN_DURATIONS_MS.includes(duration) ? duration : 4000;
+  }
+
+  function shotSpinAngles(shot) {
+    const durationMs = shotSpinDurationMs(shot);
+    const chamberIndex = Math.max(0, Math.min(5, Math.trunc(Number(shot && shot.chamberIndex) || 0)));
+    const finalAngle = -(1440 + chamberIndex * 60);
+    const startAngle = finalAngle + SHOT_SPIN_SPEED_DEG_PER_SEC * durationMs / 1000;
+    return { durationMs, startAngle, finalAngle };
+  }
 
   function tombstoneImage(skin) {
     const knownSkins = new Set(["outlaw", "duchess", "cyber", "boss", "phantom"]);
@@ -118,6 +133,7 @@
     lastState: null,
     preShotState: null,
     lastShotSeq: 0,
+    shotResultSeq: 0,
     shotAnimUntil: 0,
     shotResultAt: 0,
     activeShotSeq: 0,
@@ -481,7 +497,7 @@
   }
 
   function playShotAnimationSequence(shot) {
-    const spinDuration = 4200;
+    const spinDuration = shotSpinDurationMs(shot);
     const totalDuration = 8500;
     rl.shotStageStep = "SPIN";
     rl.shotResultAt = Date.now() + spinDuration;
@@ -497,38 +513,55 @@
     renderArena(rl.lastState, "SPIN");
 
     rl.shotAnimTimer = setTimeout(() => {
-      rl.shotStageStep = "RESULT";
-      if (shot.fired) {
-        AudioFX.playGunshot();
-        if (shot.guardAbsorbed) {
-          showSeatHappy(shot.damageTargetId || shot.shooterId, `guard:${shot.seq}`);
-        } else if (shot.damageRedirected) {
-          showSeatHappy(shot.shooterId, `boneco:${shot.seq}`);
-        } else if (shot.chooserId && shot.chooserId !== shot.shooterId) {
-          showSeatHappy(shot.chooserId, `shot:${shot.seq}`);
-        }
-        if (window.innerWidth > 960) triggerShotFlash();
-        if (shot.eliminated || shot.damageTargetEliminated) {
-          setTimeout(() => AudioFX.playEliminated(), 320);
-        }
+      const latestShot = rl.lastState && rl.lastState.lastShot;
+      if (latestShot && latestShot.resultReady) {
+        revealShotResult(latestShot);
       } else {
-        AudioFX.playDryFire();
+        rl.shotStageStep = "WAIT_RESULT";
+        renderArena(rl.lastState, "WAIT_RESULT");
       }
-      renderArena(rl.lastState, "RESULT");
-      rl.shotReactionTimer = window.setTimeout(() => {
-        rl.shotReactionTimer = null;
-        if (
-          rl.activeShotSeq === Number(shot.seq) &&
-          rl.lastState &&
-          rl.lastState.phase === "ROULETTE_SHOT" &&
-          rl.lastState.lastShot &&
-          Number(rl.lastState.lastShot.seq) === Number(shot.seq)
-        ) {
-          renderArena(rl.lastState, "RESULT");
-        }
-      }, SHOT_REACTION_MS);
-      if (shot.guardAbsorbed) playOneShotFx(el.shotOverlayFx, "fx_guarda", 450);
     }, spinDuration);
+  }
+
+  function revealShotResult(shot) {
+    const seq = Number(shot && shot.seq || 0);
+    if (!seq || !shot.resultReady || rl.shotResultSeq === seq) return false;
+
+    rl.shotResultSeq = seq;
+    rl.shotStageStep = "RESULT";
+    if (shot.fired) {
+      AudioFX.playGunshot();
+      if (shot.guardAbsorbed) {
+        showSeatHappy(shot.damageTargetId || shot.shooterId, `guard:${shot.seq}`);
+      } else if (shot.damageRedirected) {
+        showSeatHappy(shot.shooterId, `boneco:${shot.seq}`);
+      } else if (shot.chooserId && shot.chooserId !== shot.shooterId) {
+        showSeatHappy(shot.chooserId, `shot:${shot.seq}`);
+      }
+      if (window.innerWidth > 960) triggerShotFlash();
+      if (shot.eliminated || shot.damageTargetEliminated) {
+        setTimeout(() => AudioFX.playEliminated(), 320);
+      }
+    } else {
+      AudioFX.playDryFire();
+    }
+
+    renderArena(rl.lastState, "RESULT");
+    rl.shotReactionTimer = window.setTimeout(() => {
+      rl.shotReactionTimer = null;
+      if (
+        rl.activeShotSeq === seq &&
+        rl.lastState &&
+        rl.lastState.phase === "ROULETTE_SHOT" &&
+        rl.lastState.lastShot &&
+        Number(rl.lastState.lastShot.seq) === seq &&
+        rl.lastState.lastShot.resultReady
+      ) {
+        renderArena(rl.lastState, "RESULT");
+      }
+    }, SHOT_REACTION_MS);
+    if (shot.guardAbsorbed) playOneShotFx(el.shotOverlayFx, "fx_guarda", 450);
+    return true;
   }
 
   function triggerShotFlash() {
@@ -639,30 +672,8 @@
 
   function renderArenaFeed(logs, data, animStep) {
     const sourceLogs = logs || [];
-    const spinInProgress =
-      animStep === "SPIN" || Date.now() < rl.shotResultAt;
-    const spinningShot = data
-      && data.phase === "ROULETTE_SHOT"
-      && spinInProgress
-      && data.lastShot;
-    const spinningTarget = spinningShot
-      && (data.players || []).find((player) => player.id === data.lastShot.shooterId);
-    const targetNick = spinningTarget && String(spinningTarget.nick || "").toLocaleLowerCase("pt-BR");
-    const displayLogs = spinningTarget && targetNick
-      ? sourceLogs.filter((line) => {
-          const message = String(line || "");
-          const upper = message.toLocaleUpperCase("pt-BR");
-          const mentionsTarget = message.toLocaleLowerCase("pt-BR").includes(targetNick);
-          const currentShotOutcome =
-            upper.startsWith("BANG!")
-            || upper.startsWith("*CLIQUE*!")
-            || (upper.includes("GUARDA-COSTAS") && upper.includes("MORREU"))
-            || upper.startsWith("PULSO FIRME:")
-            || upper.startsWith("SANGUE FRIO:")
-            || upper.startsWith("SEDE DE SANGUE:");
-          return !(mentionsTarget && currentShotOutcome);
-        })
-      : sourceLogs;
+    // O servidor mantém o feed anterior ao disparo até liberar o resultado.
+    const displayLogs = sourceLogs;
     const feedKey = JSON.stringify(displayLogs);
     if (el.logList.dataset.feedKey === feedKey) return;
     const previousTop = el.logList.scrollTop;
@@ -739,21 +750,32 @@
     const target = (data.players || []).find((p) => p.id === shot.shooterId);
     if (!target) return;
 
+    const resultReady = shot.resultReady === true;
     const bulletCount = Math.max(1, Math.min(6, shot.bulletCountBefore || 1));
-    const chamberIndex = Number(shot.chamberIndex || 0);
-    const finalAngle = -(chamberIndex * 60 + 1440);
+    const { durationMs, startAngle, finalAngle } = shotSpinAngles(shot);
+    el.shotOverlayDrum.style.setProperty(
+      "--drum-spin-duration",
+      `${durationMs}ms`
+    );
+    el.shotOverlayDrum.style.setProperty("--overlay-drum-start-angle", `${startAngle}deg`);
     const isSpin = animStep === "SPIN";
     const sourceLabel = shotSourceLabel(shot);
     const damageTxt = shot.damage === 2 ? " (dano 2)" : "";
 
     el.shotOverlay.classList.remove("hidden");
     el.shotOverlay.classList.toggle("shot-result", !isSpin);
+    const pointer = el.shotOverlay.querySelector(".shot-overlay-pointer");
+    if (pointer) pointer.classList.remove("hidden");
 
-    if (isSpin) {
-      el.shotOverlayTitle.textContent = sourceLabel
+    if (!resultReady) {
+      el.shotOverlayTitle.textContent = !isSpin
+        ? "TAMBOR PAROU — AGUARDANDO RESULTADO..."
+        : sourceLabel
         ? `${sourceLabel}! ${target.nick} VAI GIRAR...`
         : `${target.nick} FOI ESCOLHIDO...`;
-      if (shot.bonecoPenalty) {
+      if (!isSpin) {
+        el.shotOverlayDetail.textContent = "O servidor está confirmando o resultado.";
+      } else if (shot.bonecoPenalty) {
         el.shotOverlayDetail.textContent = bonecoPenaltyDetail(shot);
       } else {
         el.shotOverlayDetail.textContent = shot.curse
@@ -775,7 +797,7 @@
       if (shot.guardAbsorbed) {
         el.shotOverlayTitle.textContent = `BONECO VUDÚ! O GUARDA-COSTAS SALVOU ${victimName}!`;
         el.shotOverlayDetail.textContent =
-          `O tiro contra ${target.nick} transferiu ${shot.damage} dano(s) para ${victimName}, mas o capanga absorveu o disparo.`;
+          `O tiro contra ${target.nick} transferiu ${shot.damage} dano(s) para ${victimName}, mas o capanga absorveu o disparo. O tambor dele vai para ${victim ? victim.odds : "3/6"}.`;
       } else if (shot.damageTargetEliminated) {
         el.shotOverlayTitle.textContent = `BANG! ${victimName} FOI ELIMINADO!`;
         el.shotOverlayDetail.textContent =
@@ -788,7 +810,7 @@
     } else if (shot.guardAbsorbed) {
       el.shotOverlayTitle.textContent = `GUARDA-COSTAS! ${target.nick} NÃO MORREU!`;
       el.shotOverlayDetail.textContent =
-        `O capanga morreu no lugar dele. ${target.nick} ficou com 1 vida e o tambor foi para 3/6.`;
+        `O capanga morreu no lugar dele. ${target.nick} ficou com 1 vida e o tambor foi para ${target.odds || shot.oddsAfter || "3/6"}.`;
     } else if (shot.fired && shot.eliminated) {
       el.shotOverlayTitle.textContent = `BANG! ${target.nick} FOI ELIMINADO!`;
       el.shotOverlayDetail.textContent =
@@ -796,7 +818,7 @@
     } else if (shot.fired) {
       el.shotOverlayTitle.textContent = `BANG! ${target.nick} PERDEU ${shot.damage} VIDA${shot.damage > 1 ? "S" : ""}!`;
       el.shotOverlayDetail.textContent =
-        `A câmara marcada pela seta tinha munição (${shot.oddsBefore})${damageTxt}. Restam ${shot.livesLeft} vidas.`;
+        `A câmara marcada pela seta tinha munição (${shot.oddsBefore})${damageTxt}. Restam ${shot.livesLeft} vidas; próxima chance: ${shot.oddsAfter}.`;
     } else {
       el.shotOverlayTitle.textContent = `CLIQUE! ${target.nick} SOBREVIVEU!`;
       const pulsoTxt = shot.pulso === "success"
@@ -813,15 +835,15 @@
     el.shotOverlayDrum.src = `assets/tambor/Tambor-${bulletCount}M.png`;
     el.shotOverlayDrum.style.setProperty("--overlay-drum-angle", `${finalAngle}deg`);
     el.shotOverlayDrum.classList.toggle("spinning", isSpin);
-    if (!isSpin) el.shotOverlayDrum.style.transform = `rotate(${finalAngle}deg)`;
+    el.shotOverlayDrum.style.transform = `rotate(${isSpin ? startAngle : finalAngle}deg)`;
 
-    el.shotOverlayGun.src = isSpin
+    el.shotOverlayGun.src = !resultReady
       ? "assets/revolver_spin.gif"
       : shot.fired
         ? "assets/revolver_bang.png"
         : "assets/revolver_click.png";
 
-    if (isSpin) {
+    if (!resultReady) {
       // O servidor já conhece o resultado, mas a animação não pode entregá-lo
       // antes que a câmara pare.
       el.shotOverlayCharacter.src = characterGif(target.skin, "scared");
@@ -860,6 +882,13 @@
       : 0;
     rl.preShotState = prevSeq === seq ? null : (previousState || null);
     rl.lastState = data;
+    if (data.lastShot.resultReady) {
+      rl.shotStageStep = "RESULT";
+      rl.shotResultAt = Date.now();
+      rl.shotAnimUntil = Date.now() + SHOT_REACTION_MS;
+      revealShotResult(data.lastShot);
+      return true;
+    }
     playShotAnimationSequence(data.lastShot);
     return true;
   }
@@ -899,6 +928,7 @@
       rl.shotReactionTimer = null;
       rl.activeShotSeq = 0;
       rl.lastShotSeq = 0;
+      rl.shotResultSeq = 0;
       rl.shotStageStep = "IDLE";
       rl.preShotState = null;
       rl.lastAbilitySeq = 0;
@@ -946,18 +976,26 @@
       data.phase === "ROULETTE_SHOT" &&
       data.lastShot &&
       Date.now() < rl.shotAnimUntil;
-    if (!justStartedShot && !shotStillAnimating) {
+    if (
+      !justStartedShot &&
+      !shotStillAnimating &&
+      data.phase === "ROULETTE_SHOT" &&
+      data.lastShot &&
+      data.lastShot.resultReady &&
+      rl.shotResultSeq !== Number(data.lastShot.seq)
+    ) {
+      revealShotResult(data.lastShot);
+    } else if (!justStartedShot && !shotStillAnimating) {
       const step = Date.now() < rl.shotAnimUntil ? "RESULT" : "IDLE";
       if (step === "IDLE") rl.shotStageStep = "IDLE";
       renderArena(data, step);
-    } else if (
-      !justStartedShot &&
-      shotStillAnimating &&
-      Date.now() >= rl.shotResultAt &&
-      rl.shotStageStep === "SPIN"
-    ) {
-      rl.shotStageStep = "RESULT";
-      renderArena(data, "RESULT");
+    } else if (!justStartedShot && shotStillAnimating && Date.now() >= rl.shotResultAt) {
+      if (data.lastShot.resultReady) {
+        if (!revealShotResult(data.lastShot)) renderArena(data, "RESULT");
+      } else if (rl.shotStageStep === "SPIN") {
+        rl.shotStageStep = "WAIT_RESULT";
+        renderArena(data, "WAIT_RESULT");
+      }
     }
   }
 
@@ -1157,22 +1195,26 @@
 
   function abilityReason(me, phase, data) {
     if (!me) return "Sem jogador";
+    const flags = me.flags || {};
+    if (flags.roletasPending) return "Roleta guardada para o próximo giro da Viper";
+    if (flags.sanguePending) return "Sangue por Sangue guardado para a próxima roleta";
+    if (phase === "ROULETTE_SHOT") return "Aguarde a roleta parar";
+    if (!["PLAYING_CARDS", "CHOOSE_TARGET", "PREP"].includes(phase)) {
+      return "Só durante a partida";
+    }
     if (me.skin === "boss") {
       return me.guard ? "Armada" : (me.marks < 2 ? "2 setes para armar" : "Sem ficha");
     }
     if (me.ficha < 1) return "Sem ficha";
-    const flags = me.flags || {};
-    if (me.skin === "outlaw") return flags.municao ? "" : phase === "PREP" ? "Aguarde a etapa do Billy" : "Só na preparação";
-    if (me.skin === "duchess") return flags.roletas ? "" : phase === "PREP" ? "Aguarde sua etapa" : "Só quando for girar";
+    if (me.skin === "outlaw") return flags.municao ? "" : "Sem alvo disponível";
+    if (me.skin === "duchess") return flags.roletas ? "" : "Roleta indisponível";
     if (me.skin === "cyber") {
       if (flags.curto) return "";
       return phase === "PLAYING_CARDS" ? "Sem alvo com cartas" : "Só na fase de cartas";
     }
     if (me.skin === "phantom") {
       if (flags.sangue) return "";
-      return phase === "PREP"
-        ? me.lives < 2 ? "Precisa de 2+ vidas" : "Aguarde a etapa do Reaper"
-        : "Só na preparação";
+      return me.lives < 2 ? "Precisa de 2+ vidas" : "Sangue por Sangue indisponível";
     }
     return "Indisponível";
   }
@@ -1322,6 +1364,7 @@
     el.abilityModalCancel.textContent = "CANCELAR";
     el.abilityModalTitle.textContent = title;
     el.abilityModalText.textContent = text || "";
+    el.abilityModalText.classList.remove("ability-modal-warning");
     el.abilityModalOptions.innerHTML = "";
 
     (options || []).forEach((opt) => {
@@ -1329,6 +1372,11 @@
       btn.type = "button";
       btn.className = "pixel-btn ability-option " + (opt.className || "btn-slate");
       btn.disabled = !!opt.disabled;
+      if (opt.locked) {
+        btn.classList.add("ability-option-locked");
+        btn.setAttribute("aria-disabled", "true");
+        btn.title = opt.lockedMessage || "Modo bloqueado no momento.";
+      }
 
       const label = document.createElement("span");
       label.className = "ability-option-label";
@@ -1341,8 +1389,19 @@
         sub.textContent = opt.sub;
         btn.appendChild(sub);
       }
+      if (opt.locked) {
+        const lock = document.createElement("span");
+        lock.className = "ability-option-lock";
+        lock.setAttribute("aria-hidden", "true");
+        btn.appendChild(lock);
+      }
       btn.addEventListener("click", () => {
         AudioFX.playClick();
+        if (opt.locked) {
+          el.abilityModalText.textContent = opt.lockedMessage || "Modo bloqueado no momento.";
+          el.abilityModalText.classList.add("ability-modal-warning");
+          return;
+        }
         opt.onClick && opt.onClick();
       });
       el.abilityModalOptions.appendChild(btn);
@@ -1386,7 +1445,7 @@
   }
 
   function openBillyModal(data) {
-    const options = aliveOpponents(data).map((p) => ({
+    const options = aliveOpponents(data).filter((p) => !p.marcado).map((p) => ({
       label: `${p.nick}`,
       sub: `${SKIN_LABELS[p.skin] || p.skin} • ${p.lives} vida(s) • tambor ${p.odds}`,
       className: "btn-slate",
@@ -1406,7 +1465,7 @@
   function openViperModal() {
     openAbilityModal(
       "ROLETA DE CABEÇAS",
-      "A Viper vai sortear um jogador vivo (pode ser ela mesma). O sorteado recebe +1 munição e gira depois dela. O sorteio é público.",
+      "A ficha é gasta agora. O sorteio fica guardado para o próximo giro normal da Viper; o sorteado recebe +1 munição e gira depois dela. O sorteio será público.",
       [{
         label: "GIRAR A ROLETA",
         sub: "Gasta 1 ficha",
@@ -1461,33 +1520,56 @@
   }
 
   function openReaperModal(data) {
+    const me = data.me || {};
     const mePlayer = data.players.find((p) => p.id === rl.clientId);
+    const flags = me.flags || {};
+    const reaperIsCurrentTarget = data.phase === "PREP" && data.targetId === rl.clientId;
     const options = [];
-    if (data.prepStage === 0) {
-      options.push({
-        label: "MALDIÇÃO",
-        sub: "Alvo gira agora com no mínimo 4/6",
-        className: "btn-red",
-        onClick: () => openReaperTargetModal(data, "maldicao", "MALDIÇÃO", "Escolha quem vai girar agora. O tambor dele terá no mínimo 4/6."),
-      });
-      options.push({
-        label: "SELO DE CHUMBO",
-        sub: "Alvo começa todo giro com +1 bala",
-        className: "btn-slate",
-        onClick: () => openReaperTargetModal(data, "selo", "SELO DE CHUMBO", "Escolha quem receberá o Selo até o fim da partida."),
-      });
-    } else if (data.prepStage === 3 && data.targetId === rl.clientId) {
-      options.push({
-        label: "BONECO VUDÚ",
-        sub: "Paga 1 vida + 1 ficha; transfere o dano ou força punição",
-        className: "btn-orange",
-        onClick: () => openReaperTargetModal(data, "boneco", "BONECO VUDÚ", "Escolha um jogador vivo para amaldiçoar. O prazo inclui esta rodada e as quatro seguintes. Se um disparo atingir você, todo o dano passa para o amaldiçoado e o efeito termina. Sem transferência até o fim da quinta rodada, a maldição acaba antes de você girar com no mínimo 5/6; com 1 vida, o Espectro limita o giro a 2/6. A punição não transfere dano."),
-      });
-    }
+    options.push({
+      label: "MALDIÇÃO",
+      sub: data.phase === "PREP"
+        ? "Alvo gira agora com no mínimo 4/6"
+        : "Fica guardada para a próxima preparação",
+      className: "btn-red",
+      locked: !flags.sangue,
+      lockedMessage: "Sangue por Sangue indisponível no momento.",
+      onClick: () => openReaperTargetModal(
+        data, "maldicao", "MALDIÇÃO",
+        data.phase === "PREP"
+          ? "Escolha quem vai girar agora. O tambor terá no mínimo 4/6."
+          : data.phase === "PLAYING_CARDS"
+            ? "Escolha o alvo. A Maldição será resolvida quando a fase de cartas terminar, na próxima preparação."
+            : "Escolha o alvo. A Maldição será resolvida assim que o alvo normal for escolhido e a próxima preparação começar."
+      ),
+    });
+    options.push({
+      label: "SELO DE CHUMBO",
+      sub: "Aplicado agora; +1 bala por giro até o Reaper morrer",
+      className: "btn-slate",
+      locked: !flags.sangue,
+      lockedMessage: "Sangue por Sangue indisponível no momento.",
+      onClick: () => openReaperTargetModal(
+        data, "selo", "SELO DE CHUMBO",
+        "Escolha quem receberá o Selo. Ele começa a afetar os próximos giros e dura até o Reaper morrer."
+      ),
+    });
+    options.push({
+      label: "BONECO VUDÚ",
+      sub: reaperIsCurrentTarget
+        ? "Ativa para este giro do Reaper"
+        : "Fica guardado para o próximo giro do Reaper",
+      className: "btn-orange",
+      locked: !flags.boneco,
+      lockedMessage: "Já existe um Boneco Vudú ativo ou guardado.",
+      onClick: () => openReaperTargetModal(
+        data, "boneco", "BONECO VUDÚ",
+        "Escolha um jogador vivo para amaldiçoar. Se o Reaper já for o alvo desta preparação, o Boneco ativa para este giro; caso contrário, fica guardado para o próximo giro do Reaper. O prazo de cinco rodadas começa quando ativar."
+      ),
+    });
 
     openAbilityModal(
       "SANGUE POR SANGUE",
-      `Pague 1 vida e 1 ficha (você tem ${mePlayer ? mePlayer.lives : "?"} vida(s)) e escolha o efeito desta etapa.`,
+      `Pague 1 vida e 1 ficha (você tem ${mePlayer ? mePlayer.lives : "?"} vida(s)). Você pode ativar em qualquer fase antes do giro; alguns efeitos ficam guardados para a próxima preparação ou roleta.`,
       options
     );
   }
@@ -1730,8 +1812,9 @@
         const victimName = sh.damageTargetNick || "o amaldiçoado";
         el.phaseBanner.className = sh.guardAbsorbed ? "status-banner win" : "status-banner lose";
         if (sh.guardAbsorbed) {
+          const protectedPlayer = data.players.find((p) => p.id === sh.damageTargetId);
           el.phaseBanner.textContent = `BONECO VUDÚ! O CAPANGA SALVOU ${victimName}!`;
-          el.shotDetail.textContent = `O tiro contra ${sh.shooterNick} transferiu ${sh.damage} dano(s) para ${victimName}, mas o Guarda-Costas absorveu o disparo.`;
+          el.shotDetail.textContent = `O tiro contra ${sh.shooterNick} transferiu ${sh.damage} dano(s) para ${victimName}, mas o Guarda-Costas absorveu o disparo. O tambor de ${victimName} vai para ${protectedPlayer ? protectedPlayer.odds : "3/6"}.`;
         } else if (sh.damageTargetEliminated) {
           el.phaseBanner.textContent = `BANG! ${victimName} FOI ELIMINADO!`;
           el.shotDetail.textContent = `O Boneco Vudú transferiu ${sh.damage} dano(s) do tiro que atingiu ${sh.shooterNick} (${sh.oddsBefore}).`;
@@ -1742,8 +1825,9 @@
       } else if (sh.guardAbsorbed) {
         el.phaseBanner.className = "status-banner win";
         el.phaseBanner.textContent = `GUARDA-COSTAS! ${sh.shooterNick} SOBREVIVEU!`;
+        const guardedPlayer = data.players.find((p) => p.id === sh.shooterId);
         el.shotDetail.textContent =
-          `O capanga morreu no lugar de ${sh.shooterNick}. Ele ficou com 1 vida e o tambor foi para 3/6.`;
+          `O capanga morreu no lugar de ${sh.shooterNick}. Ele ficou com 1 vida e o tambor foi para ${guardedPlayer ? guardedPlayer.odds : sh.oddsAfter || "3/6"}.`;
       } else if (sh.fired) {
         el.phaseBanner.className = "status-banner lose";
         el.phaseBanner.textContent = sh.eliminated
@@ -1751,7 +1835,7 @@
           : `BANG! ${sh.shooterNick} PERDEU ${sh.damage} VIDA${sh.damage > 1 ? "S" : ""}!`;
         el.shotDetail.textContent = sh.eliminated
           ? `${sh.chooserNick} escolheu ${sh.shooterNick}; ele atirou em si mesmo (${sh.oddsBefore}) e saiu do jogo!`
-          : `${sh.shooterNick} atirou em si mesmo (${sh.oddsBefore})${sh.damage > 1 ? " com dano 2" : ""}! Restam ${sh.livesLeft} vidas (tambor voltou a 1/6).`;
+          : `${sh.shooterNick} atirou em si mesmo (${sh.oddsBefore})${sh.damage > 1 ? " com dano 2" : ""}! Restam ${sh.livesLeft} vidas; próxima chance: ${sh.oddsAfter}.`;
       } else {
         el.phaseBanner.className = "status-banner push";
         el.phaseBanner.textContent = `*CLIQUE*! ${sh.shooterNick} SOBREVIVEU!`;
@@ -1883,16 +1967,18 @@
         data.lastShot &&
         data.lastShot.shooterId === p.id &&
         animStep !== "IDLE";
-      const drumBulletCount = data.lastShot && data.lastShot.shooterId === p.id
-        ? data.lastShot.bulletCountBefore
-        : p.bullets;
-      const chamberIndex = data.lastShot && data.lastShot.shooterId === p.id
-        ? data.lastShot.chamberIndex
-        : 0;
-      const drumRotation = -(Number(chamberIndex || 0) * 60 + 1440);
+      const activeSeatShot = data.lastShot && data.lastShot.shooterId === p.id
+        ? data.lastShot
+        : null;
+      const drumBulletCount = activeSeatShot ? activeSeatShot.bulletCountBefore : p.bullets;
+      const {
+        durationMs: drumSpinDuration,
+        startAngle: drumStartAngle,
+        finalAngle: drumRotation,
+      } = shotSpinAngles(activeSeatShot);
       let selfShotGunSrc = "";
       if (isSelfShotTarget) {
-        selfShotGunSrc = animStep === "SPIN"
+        selfShotGunSrc = !data.lastShot.resultReady
           ? "assets/revolver_spin.gif"
           : data.lastShot.fired
             ? "assets/revolver_bang.png"
@@ -1903,7 +1989,7 @@
              <span class="self-shot-pointer" aria-hidden="true"></span>
              <img src="assets/tambor/Tambor-${Math.max(1, Math.min(6, drumBulletCount || 1))}M.png"
                   class="pixel-img self-shot-drum${animStep === "SPIN" ? " spinning" : ""}"
-                  style="--drum-angle: ${drumRotation}deg"
+                  style="--drum-angle: ${drumRotation}deg; --drum-spin-start-angle: ${drumStartAngle}deg; --drum-spin-duration: ${drumSpinDuration}ms"
                   alt="Tambor com ${drumBulletCount} munição(ões)" />
            </div>`
         : "";
@@ -1999,10 +2085,8 @@
     AudioFX.playClick();
     try {
       const data = await apiPost("/api/roulette/shoot", { targetId });
-      // The manual shooter must not wait for the next 900ms polling cycle.
-      // Start immediately from the POST response; duplicate polling states
-      // are ignored by activeShotSeq.
-      startShotAnimationIfNeeded(data);
+      // applyServerState captures the pre-shot snapshot before starting the
+      // animation, including when this response comes from the manual shooter.
       applyServerState(data);
     } catch (_) {}
   }

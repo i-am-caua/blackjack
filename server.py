@@ -10,6 +10,7 @@ Sistema de habilidades (HABILIDADES.md):
   - existe uma janela de preparação de 8s entre a escolha do alvo e o giro do tambor.
 """
 import argparse
+import copy
 import http.server
 import json
 import mimetypes
@@ -24,7 +25,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAX_PLAYERS = 5
 CARD_TURN_TIMEOUT_SEC = 40
 PREP_WINDOW_SEC = 8.0
-SHOT_ANIM_SEC = 4.5
+SHOT_SPIN_DURATIONS_MS = (2500, 3000, 3500, 4000)
 SHOT_AUTO_NEXT_SEC = 9.0
 WINNER_SCREEN_SEC = 10.0
 LOBBY_STALE_SEC = 120.0
@@ -53,7 +54,7 @@ KITS = {
         "name": "Viper",
         "role": "Duquesa",
         "passive": ("PULSO FIRME", "75% de não subir a bala no 1/6 (1× por vida)"),
-        "charge": ("SANGUE FRIO", "Sobreviver a um giro em 4/6 ou 5/6 = ficha"),
+        "charge": ("SANGUE FRIO", "Clique em 3/6, 4/6 ou 5/6 = ficha"),
         "active": ("ROLETA DE CABEÇAS", "Sorteia alguém: +1 bala e roleta"),
         "marksMax": 0,
     },
@@ -166,6 +167,7 @@ def fresh_ability_state():
         "selo": False,         # Selo de Chumbo ativo
         "marcado": False,      # Munição Turbinada ativa
         "marcadoOwner": None,
+        "marcadoSkipMainShot": False,
         "espiada": None,       # Zero: SEGURA | PERIGOSA
         "reserved": None,      # Zero: carta reservada do topo
     }
@@ -182,6 +184,7 @@ class RouletteRoom:
         self.current_shooter_id = None
         self.round_winners = []
         self.last_shot = None
+        self.shot_pre_state = None
         self.shot_seq = 0
         self.phase_started_at = time.time()
         self.shot_ready_at = 0.0
@@ -199,6 +202,8 @@ class RouletteRoom:
         self.ability_seq = 0
         self.last_ability = None
         self.boneco_curse = None  # Reaper: redireciona um disparo por até 5 rodadas
+        self.pending_viper_roleta = None
+        self.pending_reaper_ability = None
 
         # Último alvo escolhido por cada bot (evita repetir a mesma vítima).
         self.bot_last_targets = {}
@@ -207,6 +212,9 @@ class RouletteRoom:
     def add_log(self, msg):
         self.logs.insert(0, msg)
         self.logs = self.logs[:40]
+
+    def _active_ability_phase(self):
+        return self.phase in ("PLAYING_CARDS", "CHOOSE_TARGET", "PREP")
 
     def _draw(self):
         if len(self.shoe) < 26:
@@ -411,8 +419,11 @@ class RouletteRoom:
             self.shot_seq = 0
             self.ability_seq = 0
             self.last_shot = None
+            self.shot_pre_state = None
             self.last_ability = None
             self.boneco_curse = None
+            self.pending_viper_roleta = None
+            self.pending_reaper_ability = None
             self.winner_champion_id = None
             self.winner_screen_until = 0.0
             self.target_id = None
@@ -656,8 +667,7 @@ class RouletteRoom:
             self._start_round()
 
     def _arm_boneco(self, reaper, target):
-        reaper["lives"] -= 1
-        reaper["ficha"] = 0
+        # A vida e a ficha são cobradas uma única vez no fluxo geral de Sangue.
         self.boneco_curse = {
             "reaperId": reaper["id"],
             "targetId": target["id"],
@@ -665,8 +675,8 @@ class RouletteRoom:
             "expiresRound": self.round_num + 4,
         }
         self.add_log(
-            f"BONECO VUDÚ: {reaper['nick']} pagou 1 vida e 1 ficha e amaldiçoou "
-            f"{target['nick']} por 5 rodadas, contando esta. O primeiro disparo que "
+            f"BONECO VUDÚ: {reaper['nick']} amaldiçoou {target['nick']} por 5 rodadas, "
+            "contando esta. O primeiro disparo que "
             "atingir o Reaper transfere o dano exato."
         )
         self._ability_event(
@@ -675,6 +685,54 @@ class RouletteRoom:
             f"{target['nick']} foi amaldiçoado por 5 rodadas, contando esta",
             target["id"],
         )
+
+    def _launch_maldicao(self, reaper, target):
+        self.add_log(
+            f"MALDIÇÃO: {reaper['nick']} forçou {target['nick']} a girar "
+            "com mínimo 4/6."
+        )
+        self._ability_event(reaper, "fx_maldicao", f"Maldição em {target['nick']}", target["id"])
+        if self.prep:
+            self.prep["remaining"] = max(2.0, self.prep["deadline"] - time.time())
+            if self.prep.get("actorId") == reaper["id"]:
+                self._complete_prep_stage(reaper)
+        self._begin_spins([{
+            "pid": target["id"],
+            "killer": reaper["id"],
+            "min4": True,
+            "curse": True,
+            "note": "MALDICAO",
+        }], "PREP")
+
+    def _resolve_pending_reaper_curse(self):
+        pending = self.pending_reaper_ability
+        if not pending or pending.get("mode") != "maldicao":
+            return False
+        reaper = self._find_player(pending.get("ownerId"))
+        target = self._find_player(pending.get("targetId"))
+        self.pending_reaper_ability = None
+        if not reaper or not reaper["alive"]:
+            self.add_log("SANGUE POR SANGUE: a Maldição guardada foi cancelada porque o Reaper foi eliminado.")
+            return False
+        if not target or not target["alive"]:
+            self.add_log("SANGUE POR SANGUE: a Maldição guardada foi cancelada porque o alvo não está mais vivo.")
+            return False
+        self._launch_maldicao(reaper, target)
+        return True
+
+    def _activate_pending_boneco(self, reaper):
+        pending = self.pending_reaper_ability
+        if (
+            not pending or pending.get("mode") != "boneco"
+            or pending.get("ownerId") != reaper["id"]
+        ):
+            return
+        target = self._find_player(pending.get("targetId"))
+        self.pending_reaper_ability = None
+        if not target or not target["alive"]:
+            self.add_log("BONECO VUDÚ: a maldição guardada foi cancelada porque o alvo foi eliminado.")
+            return
+        self._arm_boneco(reaper, target)
 
     def _resolve_boneco_expiry_if_due(self):
         curse = self.boneco_curse
@@ -737,8 +795,10 @@ class RouletteRoom:
         chooser = self._find_player(chooser_id)
         self.add_log(
             f"JANELA DE PREPARAÇÃO: {chooser['nick']} escolheu {target['nick']}. "
-            f"Habilidades podem ser usadas por {PREP_WINDOW_SEC:.0f}s."
+            f"Todos têm {PREP_WINDOW_SEC:.0f}s para confirmar; habilidades podem ser usadas antes do giro."
         )
+        if self._resolve_pending_reaper_curse():
+            return
         self._maybe_end_prep()
 
     def _bot_has_prep_ability(self, p):
@@ -765,9 +825,7 @@ class RouletteRoom:
                 continue
             if stage == 2 and (not target or target["id"] != p["id"]):
                 continue
-            if stage == 3 and (
-                not target or target["id"] != p["id"] or self.boneco_curse
-            ):
+            if stage == 3 and (not target or target["id"] != p["id"]):
                 continue
             result.append(p)
         return result
@@ -780,6 +838,17 @@ class RouletteRoom:
         if ready_after:
             self.prep["ready"].add(p["id"])
 
+    def _mark_billy_target(self, owner, target):
+        if target["marcado"]:
+            return
+        target["marcado"] = True
+        target["marcadoOwner"] = owner["id"]
+        # O alvo principal já foi escolhido antes da janela de preparo.
+        # Nesse caso, a marca fica guardada para o próximo giro futuro dele.
+        target["marcadoSkipMainShot"] = bool(
+            self.phase == "PREP" and target["id"] == self.target_id
+        )
+
     def _run_bot_prep_stage(self, p, stage):
         target = self._find_player(self.target_id)
         if stage == 0:
@@ -787,7 +856,10 @@ class RouletteRoom:
                 p["lives"] -= 1
                 p["ficha"] = 0
                 target["selo"] = True
-                self.add_log(f"SELO DE CHUMBO: {p['nick']} pagou 1 vida e selou {target['nick']}.")
+                self.add_log(
+                    f"SELO DE CHUMBO: {p['nick']} pagou 1 vida e selou {target['nick']} "
+                    "até o Reaper morrer."
+                )
                 self._ability_event(p, "fx_selo", f"{target['nick']} recebeu o Selo de Chumbo", target["id"])
                 self._complete_prep_stage(p)
             else:
@@ -801,8 +873,7 @@ class RouletteRoom:
             if chosen:
                 p["ficha"] = 0
                 p["streak"] = 0
-                chosen["marcado"] = True
-                chosen["marcadoOwner"] = p["id"]
+                self._mark_billy_target(p, chosen)
                 self.add_log(f"MUNIÇÃO TURBINADA: {p['nick']} marcou {chosen['nick']} (próximo tiro causa 2).")
                 self._ability_event(p, "fx_municao", f"{p['nick']} marcou {chosen['nick']}", chosen["id"])
             self._complete_prep_stage(p)
@@ -867,6 +938,23 @@ class RouletteRoom:
             "main": True,
         }]
         queue.extend(self.prep.get("extras") or [])
+        pending_roleta = self.pending_viper_roleta
+        if pending_roleta:
+            viper = self._find_player(pending_roleta.get("ownerId"))
+            if not viper or not viper["alive"]:
+                self.pending_viper_roleta = None
+            elif target["id"] == viper["id"]:
+                chosen = random.choice(self._alive())
+                queue.append({
+                    "pid": chosen["id"], "plus1": True, "killer": viper["id"],
+                    "note": "ROLETA DE CABEÇAS",
+                })
+                self.pending_viper_roleta = None
+                self.add_log(
+                    f"ROLETA DE CABEÇAS: a roleta guardada por {viper['nick']} sorteou "
+                    f"{chosen['nick']} (+1 bala; gira depois dela)."
+                )
+                self._ability_event(viper, "fx_roletas", f"Sorteio: {chosen['nick']}", chosen["id"])
         self.prep = None
         self._begin_spins(queue, "ROUND")
 
@@ -892,6 +980,8 @@ class RouletteRoom:
 
     # ------------------------------------------------------- giros / tambor
     def _compute_bullets(self, p, spin):
+        # p["bullets"] guarda a progressão-base; o Selo é um bônus de giro,
+        # reaplicado uma vez antes de cada sorteio.
         bullets = max(1, min(6, p["bullets"]))
         if p["selo"]:
             bullets += 1
@@ -920,6 +1010,7 @@ class RouletteRoom:
             if target and target["marcado"]:
                 target["marcado"] = False
                 target["marcadoOwner"] = None
+                target["marcadoSkipMainShot"] = False
 
         if self.resume_mode == "PREP":
             self._resume_prep_after_curse()
@@ -953,18 +1044,37 @@ class RouletteRoom:
                         self.add_log(f"SEDE DE SANGUE: {p['nick']} completou 3 BANGs e ganhou uma ficha!")
 
     def _do_spin(self, spin, target):
+        spin_duration_ms = random.choice(SHOT_SPIN_DURATIONS_MS)
+        if target["skin"] == "phantom":
+            self._activate_pending_boneco(target)
+        # Guarda o estado público anterior ao sorteio. A resolução interna é
+        # imediata, mas nenhum resultado pode chegar aos clientes durante o giro.
+        self.shot_pre_state = {
+            "players": copy.deepcopy(self.players),
+            "bonecoCurse": copy.deepcopy(self.boneco_curse),
+            "logs": list(self.logs),
+            "lastAbility": copy.deepcopy(self.last_ability),
+        }
         bullets_before = self._compute_bullets(target, spin)
         lives_before_shot = target["lives"]
         odds_before = f"{bullets_before}/6"
         chamber_index = random.randrange(6)
         fired = chamber_index < bullets_before
 
-        dmg = 2 if target["marcado"] else 1
-        was_marked = target["marcado"]
-        marked_owner_id = target.get("marcadoOwner")
+        skip_current_mark = (
+            target["marcado"]
+            and target.get("marcadoSkipMainShot")
+            and spin.get("main")
+        )
+        was_marked = bool(target["marcado"] and not skip_current_mark)
+        dmg = 2 if was_marked else 1
+        marked_owner_id = target.get("marcadoOwner") if was_marked else None
         if was_marked:
             target["marcado"] = False
             target["marcadoOwner"] = None
+            target["marcadoSkipMainShot"] = False
+        elif skip_current_mark:
+            target["marcadoSkipMainShot"] = False
 
         eliminated = False
         guard_absorbed = False
@@ -1010,9 +1120,10 @@ class RouletteRoom:
                 guard_absorbed = True
                 if damage_redirected:
                     target["bullets"] = 1
-                    odds_after = "1/6"
+                    odds_after = f"{self._compute_bullets(target, {})}/6"
                 else:
-                    odds_after = "3/6"
+                    odds_after = f"{self._compute_bullets(damage_target, {})}/6"
+                guard_odds = f"{self._compute_bullets(damage_target, {})}/6"
                 self._ability_event(
                     damage_target, "fx_guarda",
                     f"O capanga de {damage_target['nick']} morreu no lugar dele",
@@ -1020,7 +1131,7 @@ class RouletteRoom:
                 )
                 self.add_log(
                     f"GUARDA-COSTAS! O capanga de {damage_target['nick']} morreu no lugar dele. "
-                    f"Ele ficou com 1 vida e o tambor vai para 3/6."
+                    f"Ele ficou com 1 vida e o tambor vai para {guard_odds}."
                 )
             else:
                 damage_target["lives"] = max(0, damage_target["lives"] - dmg)
@@ -1030,6 +1141,41 @@ class RouletteRoom:
                     damage_target["alive"] = False
                     damage_target["chambers"] = 0
                     damage_target["bullets"] = 0
+                    damage_target["marcado"] = False
+                    damage_target["marcadoOwner"] = None
+                    damage_target["marcadoSkipMainShot"] = False
+                    if (
+                        self.pending_viper_roleta
+                        and self.pending_viper_roleta.get("ownerId") == damage_target["id"]
+                    ):
+                        self.pending_viper_roleta = None
+                        self.add_log("ROLETA DE CABEÇAS: a ativação guardada foi cancelada porque a Viper foi eliminada.")
+                    if (
+                        self.pending_reaper_ability
+                        and self.pending_reaper_ability.get("ownerId") == damage_target["id"]
+                    ):
+                        self.pending_reaper_ability = None
+                        self.add_log("SANGUE POR SANGUE: a ativação guardada foi cancelada porque o Reaper foi eliminado.")
+                    elif (
+                        self.pending_reaper_ability
+                        and self.pending_reaper_ability.get("targetId") == damage_target["id"]
+                    ):
+                        self.pending_reaper_ability = None
+                        self.add_log(
+                            f"SANGUE POR SANGUE: a ativação guardada foi cancelada porque "
+                            f"{damage_target['nick']} foi eliminado antes de o efeito começar."
+                        )
+                    if damage_target["skin"] == "phantom":
+                        cleared_seals = False
+                        for sealed_player in self.players:
+                            if sealed_player["selo"]:
+                                sealed_player["selo"] = False
+                                cleared_seals = True
+                        if cleared_seals:
+                            self.add_log(
+                                "SELO DE CHUMBO: com a eliminação do Reaper, "
+                                "todos os Selos ativos se desfizeram."
+                            )
                     damage_target_eliminated = True
                     eliminated = not damage_redirected
                     odds_after = "ELIMINADO"
@@ -1054,10 +1200,7 @@ class RouletteRoom:
                 else:
                     if not damage_redirected:
                         target["bullets"] = 1
-                    odds_after = (
-                        f"{self._compute_bullets(target, {})}/6"
-                        if damage_redirected else f"{target['bullets']}/6"
-                    )
+                    odds_after = f"{self._compute_bullets(target, {})}/6"
                     if damage_redirected:
                         self.add_log(
                             f"BANG! {target['nick']} não perdeu vida; o dano foi transferido. "
@@ -1068,11 +1211,13 @@ class RouletteRoom:
                         self.add_log(
                             f"BANG! {target['nick']} atirou em si mesmo ({odds_before})"
                             f"{' com dano 2' if dmg == 2 else ''}! "
-                            f"Restam {target['lives']} vidas (tambor voltou a 1/6)."
+                            f"Restam {target['lives']} vidas. Próxima chance: {odds_after}."
                         )
         else:
             target["shotsSurvived"] += 1
-            next_bullets = bullets_before + 1
+            # bullets guarda o avanço permanente do tambor; o +1 do Selo é
+            # reaplicado em cada giro e não deve ser contado duas vezes no clique.
+            next_bullets = bullets_before + 1 - (1 if target["selo"] else 0)
 
             if spin.get("reset_one") or spin.get("curse"):
                 next_bullets = 1
@@ -1092,7 +1237,7 @@ class RouletteRoom:
                     )
 
             target["bullets"] = max(1, min(6, next_bullets))
-            odds_after = f"{target['bullets']}/6"
+            odds_after = f"{self._compute_bullets(target, {})}/6"
             self.add_log(
                 f"*CLIQUE*! {target['nick']} sobreviveu ao próprio tiro ({odds_before}). "
                 f"Próxima chance: {odds_after}!"
@@ -1103,18 +1248,19 @@ class RouletteRoom:
         if damage_redirected and damage_target["skin"] == "duchess" and damage_target["lives"] < damage_target_lives_before:
             damage_target["pulsoUsed"] = False
 
-        # Sangue Frio conta qualquer giro iniciado em 4/6 ou 5/6 que a Viper
-        # sobreviva, inclusive um BANG que ainda deixe vidas.
+        # Sangue Frio só conta clique sem perda de vida em giro iniciado entre 3/6 e 5/6.
         if (
             target["skin"] == "duchess"
-            and bullets_before in (4, 5)
+            and bullets_before in (3, 4, 5)
+            and not fired
+            and target["lives"] == lives_before_shot
             and target["lives"] > 0
             and not target["sangueFrioDone"]
         ):
             target["sangueFrioDone"] = True
             if self._grant_ficha(target):
                 self.add_log(
-                    f"SANGUE FRIO: {target['nick']} sobreviveu a um giro em {odds_before} "
+                    f"SANGUE FRIO: {target['nick']} deu clique em {odds_before} sem perder vida "
                     f"e ganhou a ROLETA DE CABEÇAS!"
                 )
 
@@ -1153,6 +1299,7 @@ class RouletteRoom:
             "livesLeft": target["lives"],
             "bulletCountBefore": bullets_before,
             "chamberIndex": chamber_index,
+            "spinDurationMs": spin_duration_ms,
             "source": spin.get("note") or ("MALDICAO" if spin.get("curse") else "RODADA"),
             "isExtra": bool(spin.get("note")),
             "curse": bool(spin.get("curse")),
@@ -1160,7 +1307,7 @@ class RouletteRoom:
         }
         self.phase = "ROULETTE_SHOT"
         self.phase_started_at = time.time()
-        self.shot_ready_at = time.time() + SHOT_ANIM_SEC
+        self.shot_ready_at = time.time() + spin_duration_ms / 1000
 
     def next_after_shot(self):
         with self.lock:
@@ -1196,10 +1343,13 @@ class RouletteRoom:
         alive = self._alive()
         self.phase = "GAME_OVER"
         self.phase_started_at = time.time()
+        self.shot_pre_state = None
         self.winner_screen_until = self.phase_started_at + WINNER_SCREEN_SEC
         self.prep = None
         self.spin_queue = []
         self.boneco_curse = None
+        self.pending_viper_roleta = None
+        self.pending_reaper_ability = None
         if alive:
             champ = alive[0]
             self.winner_champion_id = champ["id"]
@@ -1218,6 +1368,7 @@ class RouletteRoom:
             self.current_shooter_id = None
             self.round_winners = []
             self.last_shot = None
+            self.shot_pre_state = None
             self.last_ability = None
             self.target_id = None
             self.chooser_id = None
@@ -1225,6 +1376,8 @@ class RouletteRoom:
             self.spin_queue = []
             self.resume_mode = None
             self.boneco_curse = None
+            self.pending_viper_roleta = None
+            self.pending_reaper_ability = None
             self.bot_last_targets = {}
             self.winner_champion_id = None
             self.winner_screen_until = 0.0
@@ -1260,16 +1413,36 @@ class RouletteRoom:
 
     # ------------------------------------------------------------ habilidades
     def _ability_flags(self, p):
-        flags = {"municao": False, "roletas": False, "curto": False, "sangue": False}
-        if not p or not p["alive"] or p["ficha"] < 1:
+        flags = {
+            "municao": False,
+            "roletas": False,
+            "roletasPending": False,
+            "curto": False,
+            "sangue": False,
+            "sanguePending": False,
+            "boneco": False,
+        }
+        if not p or not p["alive"]:
             return flags
-        stage = self.prep.get("stage") if self.prep else None
-        stage_actor = bool(self.prep and self.prep.get("actorId") == p["id"])
+        flags["roletasPending"] = bool(
+            self.pending_viper_roleta
+            and self.pending_viper_roleta.get("ownerId") == p["id"]
+        )
+        flags["sanguePending"] = bool(
+            self.pending_reaper_ability
+            and self.pending_reaper_ability.get("ownerId") == p["id"]
+        )
+        if p["ficha"] < 1 or not self._active_ability_phase():
+            return flags
+
         skin = p["skin"]
         if skin == "outlaw":
-            flags["municao"] = self.phase == "PREP" and stage == 1 and stage_actor
+            flags["municao"] = any(
+                target["alive"] and target["id"] != p["id"] and not target["marcado"]
+                for target in self.players
+            )
         elif skin == "duchess":
-            flags["roletas"] = self.phase == "PREP" and stage == 2 and stage_actor
+            flags["roletas"] = not flags["roletasPending"]
         elif skin == "cyber":
             flags["curto"] = (
                 self.phase == "PLAYING_CARDS"
@@ -1277,10 +1450,13 @@ class RouletteRoom:
                 and any(x["alive"] and x["id"] != p["id"] and x["hand"] for x in self.players)
             )
         elif skin == "phantom":
-            boneco_available = not (stage == 3 and self.boneco_curse)
             flags["sangue"] = (
-                self.phase == "PREP" and p["lives"] >= 2 and stage_actor
-                and stage in (0, 3) and boneco_available
+                p["lives"] >= 2 and not flags["sanguePending"]
+            )
+            flags["boneco"] = (
+                flags["sangue"]
+                and not self.boneco_curse
+                and not flags["sanguePending"]
             )
         return flags
 
@@ -1293,6 +1469,8 @@ class RouletteRoom:
                 return False, "Sem ficha."
             if self.phase == "ROULETTE_SHOT":
                 return False, "O tambor já está girando."
+            if not self._active_ability_phase():
+                return False, "A habilidade só pode ser usada durante uma partida ativa."
 
             kind = (kind or "").strip()
 
@@ -1300,50 +1478,45 @@ class RouletteRoom:
             if kind == "municao":
                 if p["skin"] != "outlaw":
                     return False, "Habilidade de outro personagem."
-                if self.phase != "PREP":
-                    return False, "Só na janela de preparação."
-                if not self.prep or self.prep.get("stage") != 1 or self.prep.get("actorId") != p["id"]:
-                    return False, "Aguarde a etapa do Billy na preparação."
                 target = self._find_player(target_id)
                 if not target or not target["alive"] or target["id"] == p["id"]:
                     return False, "Escolha outro jogador vivo."
+                if target["marcado"]:
+                    return False, "Esse jogador já está marcado."
                 p["ficha"] = 0
                 p["streak"] = 0  # usar a habilidade reinicia a sequência
-                target["marcado"] = True
-                target["marcadoOwner"] = p["id"]
+                self._mark_billy_target(p, target)
                 self.add_log(
                     f"MUNIÇÃO TURBINADA: {p['nick']} marcou {target['nick']} — "
                     f"o próximo tiro dele causa 2 de dano."
                 )
                 self._ability_event(p, "fx_municao", f"{target['nick']} está marcado", target["id"])
-                self._complete_prep_stage(p)
-                self._maybe_end_prep()
+                if (
+                    self.prep and self.prep.get("actorId") == p["id"]
+                    and self.prep.get("stage") == 1
+                ):
+                    self._complete_prep_stage(p)
+                    self._maybe_end_prep()
                 return True, "Munição Turbinada aplicada."
 
             # ---------------------------------------------- Viper: Roleta
             if kind == "roletas":
                 if p["skin"] != "duchess":
                     return False, "Habilidade de outro personagem."
-                if (
-                    self.phase != "PREP" or self.target_id != p["id"]
-                    or not self.prep or self.prep.get("stage") != 2
-                    or self.prep.get("actorId") != p["id"]
-                ):
-                    return False, "Só quando a Viper for escolhida para girar."
+                if self.pending_viper_roleta:
+                    return False, "A Roleta de Cabeças já está guardada para o próximo giro da Viper."
                 p["ficha"] = 0
-                chosen = random.choice(self._alive())
-                self.prep["extras"].append({
-                    "pid": chosen["id"], "plus1": True, "killer": p["id"],
-                    "note": "ROLETA DE CABEÇAS",
-                })
+                self.pending_viper_roleta = {"ownerId": p["id"]}
                 self.add_log(
-                    f"ROLETA DE CABEÇAS: {p['nick']} sorteou {chosen['nick']} "
-                    f"(+1 bala; gira depois dela)."
+                    f"ROLETA DE CABEÇAS: {p['nick']} guardou a habilidade; "
+                    "o sorteio será resolvido no próximo giro normal da Viper."
                 )
-                self._ability_event(p, "fx_roletas", f"Sorteio: {chosen['nick']}", chosen["id"])
-                self._complete_prep_stage(p)
-                self._maybe_end_prep()
-                return True, f"Sorteado: {chosen['nick']}."
+                self._ability_event(p, "fx_roletas", "Roleta guardada para o próximo giro da Viper")
+                if self.phase == "PREP" and self.target_id == p["id"]:
+                    if self.prep and self.prep.get("actorId") == p["id"]:
+                        self._complete_prep_stage(p)
+                    self._maybe_end_prep()
+                return True, "Roleta guardada para o próximo giro da Viper."
 
             # ----------------------------------------------- Zero: Curto
             if kind == "curto":
@@ -1404,25 +1577,20 @@ class RouletteRoom:
             if kind == "sangue":
                 if p["skin"] != "phantom":
                     return False, "Habilidade de outro personagem."
-                if self.phase != "PREP":
-                    return False, "Só na janela de preparação."
                 if p["lives"] < 2:
                     return False, "Precisa de 2 vidas ou mais para pagar."
                 if mode not in ("maldicao", "selo", "boneco"):
                     return False, "Escolha Maldição, Selo de Chumbo ou Boneco Vudú."
-                if not self.prep or self.prep.get("actorId") != p["id"]:
-                    return False, "Aguarde sua etapa na preparação."
-                if mode in ("maldicao", "selo") and self.prep.get("stage") != 0:
-                    return False, "Maldição e Selo pertencem à primeira etapa do Reaper."
-                if mode == "boneco" and self.prep.get("stage") != 3:
-                    return False, "Boneco Vudú pertence à última etapa do Reaper."
+                if (
+                    self.pending_reaper_ability
+                    and self.pending_reaper_ability.get("ownerId") == p["id"]
+                ):
+                    return False, "Você já tem uma habilidade Sangue por Sangue guardada."
 
                 target = self._find_player(target_id)
                 if mode in ("maldicao", "selo", "boneco"):
                     if not target or not target["alive"] or target["id"] == p["id"]:
                         return False, "Alvo inválido."
-                if mode == "boneco" and self.target_id != p["id"]:
-                    return False, "Boneco Vudú só quando o Reaper for escolhido para girar."
                 if mode == "boneco" and self.boneco_curse:
                     return False, "Já existe um Boneco Vudú ativo; não é possível acumular maldições."
 
@@ -1433,36 +1601,55 @@ class RouletteRoom:
                     target["selo"] = True
                     self.add_log(
                         f"SELO DE CHUMBO: {p['nick']} pagou 1 vida e selou {target['nick']} "
-                        f"até o fim da partida."
+                        "até o Reaper morrer."
                     )
                     self._ability_event(p, "fx_selo", f"{target['nick']} recebeu o Selo de Chumbo", target["id"])
-                    self._complete_prep_stage(p)
-                    self._maybe_end_prep()
+                    if self.prep and self.prep.get("actorId") == p["id"]:
+                        self._complete_prep_stage(p)
+                        self._maybe_end_prep()
                     return True, "Selo de Chumbo aplicado."
 
                 if mode == "maldicao":
-                    self.add_log(
-                        f"MALDIÇÃO: {p['nick']} pagou 1 vida e forçou {target['nick']} a girar "
-                        f"agora (mínimo 4/6)."
-                    )
-                    self._ability_event(p, "fx_maldicao", f"Maldição em {target['nick']}", target["id"])
-                    if self.prep:
-                        self.prep["remaining"] = max(2.0, self.prep["deadline"] - time.time())
-                    # A Maldição resolve antes de avançar às próximas etapas.
-                    self._complete_prep_stage(p)
-                    self._begin_spins([{
-                        "pid": target["id"],
-                        "killer": p["id"],
-                        "min4": True,
-                        "curse": True,
-                        "note": "MALDICAO",
-                    }], "PREP")
-                    return True, "Maldição lançada."
+                    if self.phase == "PREP":
+                        self.add_log(
+                            f"SANGUE POR SANGUE: {p['nick']} pagou 1 vida e 1 ficha; "
+                            f"a Maldição será lançada contra {target['nick']}."
+                        )
+                        self._launch_maldicao(p, target)
+                    else:
+                        self.pending_reaper_ability = {
+                            "ownerId": p["id"], "mode": mode, "targetId": target["id"],
+                        }
+                        self.add_log(
+                            f"SANGUE POR SANGUE: {p['nick']} pagou 1 vida e 1 ficha e "
+                            f"guardou a Maldição contra {target['nick']} para a próxima preparação."
+                        )
+                        self._ability_event(
+                            p, "fx_maldicao", f"Maldição guardada contra {target['nick']}", target["id"]
+                        )
+                    return True, "Maldição lançada." if self.phase == "ROULETTE_SHOT" else "Maldição guardada."
 
-                self._arm_boneco(p, target)
-                self._complete_prep_stage(p)
-                self._maybe_end_prep()
-                return True, f"{target['nick']} está amaldiçoado por 5 rodadas."
+                self.add_log(
+                    f"SANGUE POR SANGUE: {p['nick']} pagou 1 vida e 1 ficha para armar "
+                    f"o Boneco Vudú contra {target['nick']}."
+                )
+                if self.phase == "PREP" and self.target_id == p["id"]:
+                    self._arm_boneco(p, target)
+                    if self.prep and self.prep.get("actorId") == p["id"]:
+                        self._complete_prep_stage(p)
+                        self._maybe_end_prep()
+                    return True, f"{target['nick']} está amaldiçoado por 5 rodadas."
+
+                self.pending_reaper_ability = {
+                    "ownerId": p["id"], "mode": mode, "targetId": target["id"],
+                }
+                self._ability_event(
+                    p, "fx_boneco", f"Boneco guardado contra {target['nick']}", target["id"]
+                )
+                if self.prep and self.prep.get("actorId") == p["id"]:
+                    self._complete_prep_stage(p)
+                    self._maybe_end_prep()
+                return True, "Boneco Vudú guardado para o próximo giro do Reaper."
 
             return False, "Habilidade desconhecida."
 
@@ -1480,6 +1667,37 @@ class RouletteRoom:
             self.touch_network_device(viewer_ip, viewer_platform)
 
             now = time.time()
+            shot_result_pending = bool(
+                self.phase == "ROULETTE_SHOT"
+                and self.last_shot
+                and self.shot_pre_state
+                and now < self.shot_ready_at
+            )
+            staged = self.shot_pre_state if shot_result_pending else None
+            state_players = staged["players"] if staged else self.players
+            state_curse = staged["bonecoCurse"] if staged else self.boneco_curse
+            state_logs = staged["logs"] if staged else self.logs
+            state_last_ability = staged["lastAbility"] if staged else self.last_ability
+            if shot_result_pending:
+                public_shot_keys = (
+                    "seq", "chooserId", "chooserNick", "chooserSkin",
+                    "shooterId", "shooterNick", "shooterSkin",
+                    "targetId", "targetNick", "targetSkin", "oddsBefore",
+                    "bulletCountBefore", "chamberIndex", "spinDurationMs",
+                    "source", "isExtra", "curse",
+                    "bonecoPenalty",
+                )
+                state_last_shot = {
+                    key: self.last_shot[key]
+                    for key in public_shot_keys
+                    if key in self.last_shot
+                }
+                state_last_shot["resultReady"] = False
+            else:
+                state_last_shot = dict(self.last_shot) if self.last_shot else None
+                if state_last_shot:
+                    state_last_shot["resultReady"] = True
+
             time_left = 0
             if self.phase == "PLAYING_CARDS":
                 time_left = max(0, int(CARD_TURN_TIMEOUT_SEC - (now - self.phase_started_at)))
@@ -1489,7 +1707,7 @@ class RouletteRoom:
                 time_left = max(0, int(round(SHOT_AUTO_NEXT_SEC - (now - self.phase_started_at))))
 
             players_out = []
-            for p in self.players:
+            for p in state_players:
                 sc = score_hand(p["hand"]) if p["hand"] else {
                     "total": 0, "isSoft": False, "isBlackjack": False, "isBust": False,
                 }
@@ -1536,13 +1754,13 @@ class RouletteRoom:
                     "marks": marks,
                     "marksMax": kit["marksMax"],
                     "bonecoMarked": bool(
-                        self.boneco_curse
-                        and self.boneco_curse.get("targetId") == p["id"]
+                        state_curse
+                        and state_curse.get("targetId") == p["id"]
                     ),
                     "bonecoRounds": (
-                        max(0, self.boneco_curse["expiresRound"] - self.round_num + 1)
-                        if self.boneco_curse
-                        and self.boneco_curse.get("targetId") == p["id"]
+                        max(0, state_curse["expiresRound"] - self.round_num + 1)
+                        if state_curse
+                        and state_curse.get("targetId") == p["id"]
                         else 0
                     ),
                     # segredos: só para o próprio jogador
@@ -1555,52 +1773,78 @@ class RouletteRoom:
 
             me = None
             if viewer:
-                kit = KITS[viewer["skin"]]
-                flags = self._ability_flags(viewer)
+                state_viewer = next(
+                    (p for p in state_players if p["id"] == viewer["id"]),
+                    viewer,
+                )
+                kit = KITS[state_viewer["skin"]]
+                flags = self._ability_flags(state_viewer)
                 next_ficha_round = 0
-                if viewer["skin"] == "cyber":
+                if state_viewer["skin"] == "cyber":
                     next_ficha_round = (5 - (self.round_num % 5)) % 5 or 5
 
                 effect = None
-                if viewer["skin"] == "outlaw":
-                    marked = [p["nick"] for p in self.players if p["marcado"]]
+                if state_viewer["skin"] == "outlaw":
+                    marked = [p["nick"] for p in state_players if p["marcado"]]
                     if marked:
                         effect = "EFEITO ATIVO: " + ", ".join(marked) + " marcado(s)"
-                elif viewer["skin"] == "phantom":
-                    sealed = [p["nick"] for p in self.players if p["selo"]]
+                elif state_viewer["skin"] == "phantom":
+                    sealed = [p["nick"] for p in state_players if p["selo"]]
                     if sealed:
                         effect = "SELO ATIVO: " + ", ".join(sealed)
-                if self.boneco_curse:
-                    if self.boneco_curse.get("reaperId") == viewer["id"]:
-                        cursed_target = self._find_player(self.boneco_curse.get("targetId"))
+                if state_curse:
+                    if state_curse.get("reaperId") == state_viewer["id"]:
+                        cursed_target = next(
+                            (p for p in state_players if p["id"] == state_curse.get("targetId")),
+                            None,
+                        )
                         target_name = cursed_target["nick"] if cursed_target else "alvo"
                         remaining = max(
                             0,
-                            self.boneco_curse["expiresRound"] - self.round_num + 1,
+                            state_curse["expiresRound"] - self.round_num + 1,
                         )
                         effect = f"BONECO ATIVO: {target_name} • {remaining}/5 rodada(s)"
-                    elif self.boneco_curse.get("targetId") == viewer["id"]:
+                    elif state_curse.get("targetId") == state_viewer["id"]:
                         effect = "VOCÊ ESTÁ AMALDIÇOADO PELO BONECO VUDÚ"
+                if (
+                    self.pending_viper_roleta
+                    and self.pending_viper_roleta.get("ownerId") == state_viewer["id"]
+                ):
+                    effect = "ROLETA GUARDADA: será resolvida no próximo giro normal da Viper."
+                if (
+                    self.pending_reaper_ability
+                    and self.pending_reaper_ability.get("ownerId") == state_viewer["id"]
+                ):
+                    pending = self.pending_reaper_ability
+                    pending_target = self._find_player(pending.get("targetId"))
+                    target_name = pending_target["nick"] if pending_target else "alvo"
+                    pending_text = (
+                        f"MALDIÇÃO GUARDADA contra {target_name}: será resolvida na próxima preparação."
+                        if pending.get("mode") == "maldicao"
+                        else f"BONECO GUARDADO contra {target_name}: ativa no próximo giro do Reaper."
+                    )
+                    effect = f"{effect} • {pending_text}" if effect else pending_text
 
                 me = {
-                    "id": viewer["id"],
-                    "skin": viewer["skin"],
-                    "alive": viewer["alive"],
-                    "ficha": viewer["ficha"],
+                    "id": state_viewer["id"],
+                    "skin": state_viewer["skin"],
+                    "alive": state_viewer["alive"],
+                    "lives": state_viewer["lives"],
+                    "ficha": state_viewer["ficha"],
                     "marks": (
-                        viewer["streak"] if viewer["skin"] == "outlaw"
-                        else viewer["setes"] if viewer["skin"] == "boss"
-                        else viewer["blood"] if viewer["skin"] == "phantom"
+                        state_viewer["streak"] if state_viewer["skin"] == "outlaw"
+                        else state_viewer["setes"] if state_viewer["skin"] == "boss"
+                        else state_viewer["blood"] if state_viewer["skin"] == "phantom"
                         else 0
                     ),
                     "marksMax": kit["marksMax"],
-                    "streak": viewer["streak"],
-                    "setes": viewer["setes"],
-                    "blood": viewer["blood"],
-                    "guard": viewer["guard"],
-                    "espiada": viewer["espiada"],
-                    "pulsoUsed": viewer["pulsoUsed"],
-                    "sangueFrioDone": viewer["sangueFrioDone"],
+                    "streak": state_viewer["streak"],
+                    "setes": state_viewer["setes"],
+                    "blood": state_viewer["blood"],
+                    "guard": state_viewer["guard"],
+                    "espiada": state_viewer["espiada"],
+                    "pulsoUsed": state_viewer["pulsoUsed"],
+                    "sangueFrioDone": state_viewer["sangueFrioDone"],
                     "flags": flags,
                     "effect": effect,
                     "nextFichaRound": next_ficha_round,
@@ -1623,18 +1867,18 @@ class RouletteRoom:
                 "prepStage": self.prep["stage"] if self.prep else None,
                 "prepStageName": (
                     [
-                        "REAPER — MALDIÇÃO OU SELO",
+                        "REAPER — ESCOLHA UM MODO",
                         "BILLY — MUNIÇÃO TURBINADA",
                         "VIPER — ROLETA DE CABEÇAS",
-                        "REAPER — BONECO VUDÚ",
+                        "REAPER — ESCOLHA UM MODO",
                         "CONFIRMAÇÃO FINAL",
                     ][min(4, max(0, self.prep["stage"]))]
                     if self.prep else None
                 ),
                 "prepActorId": self.prep.get("actorId") if self.prep else None,
                 "prepReadyIds": sorted(self.prep["ready"]) if self.prep else [],
-                "lastShot": self.last_shot,
-                "lastAbility": self.last_ability,
+                "lastShot": state_last_shot,
+                "lastAbility": state_last_ability,
                 "championId": self.winner_champion_id,
                 "winnerScreenUntil": int(self.winner_screen_until * 1000),
                 "winnerScreenRemainingMs": max(
@@ -1642,7 +1886,7 @@ class RouletteRoom:
                     int((self.winner_screen_until - now) * 1000)
                     if self.phase == "GAME_OVER" else 0,
                 ),
-                "logs": self.logs,
+                "logs": state_logs,
                 "networkDevices": list(self.seen_devices.values()),
                 "kits": KITS,
                 "me": me,
